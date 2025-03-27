@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import ChatMessage from "../components/ChatMessage";
 import ChatInput from "../components/ChatInput";
 import ModelSelector from "../components/ModelSelector";
@@ -104,11 +105,33 @@ export default function Home() {
 							Secured LLM
 						</h1>
 					</div>
-					<ModelSelector
-						selectedModel={selectedModel}
-						setSelectedModel={setSelectedModel}
-						models={AVAILABLE_MODELS}
-					/>
+					<div className="flex items-center gap-4">
+						<Link
+							href="/vulnerabilities"
+							className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="16"
+								height="16"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								className="mr-1"
+							>
+								<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+							</svg>
+							Security Demos
+						</Link>
+						<ModelSelector
+							selectedModel={selectedModel}
+							setSelectedModel={setSelectedModel}
+							models={AVAILABLE_MODELS}
+						/>
+					</div>
 				</header>
 
 				<div
@@ -120,7 +143,7 @@ export default function Home() {
 							<div className="glass-morphism p-8 max-w-md">
 								<div className="flex justify-center mb-4">
 									<Image
-										src="/logo.png"
+										src="/logo.svg"
 										alt="Secured LLM"
 										width={80}
 										height={80}
@@ -138,6 +161,32 @@ export default function Home() {
 									Your conversation remains private and will
 									be lost when you refresh the page.
 								</p>
+								<div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+									<Link
+										href="/vulnerabilities"
+										className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+										</svg>
+										View Security Vulnerability Demos
+									</Link>
+									<p className="text-xs mt-2 opacity-60">
+										Explore common LLM security
+										vulnerabilities and learn how to
+										mitigate them
+									</p>
+								</div>
 							</div>
 						</div>
 					) : (
