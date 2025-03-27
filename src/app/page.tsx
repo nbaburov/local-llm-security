@@ -1,103 +1,179 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import ChatMessage from "../components/ChatMessage";
+import ChatInput from "../components/ChatInput";
+import ModelSelector from "../components/ModelSelector";
+
+interface Message {
+	role: "user" | "assistant";
+	content: string;
+}
+
+const AVAILABLE_MODELS = [
+	{ value: "gemma3:1b", label: "Gemma 3 (1B)" },
+	{ value: "mistral", label: "Mistral" },
+];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+	const [messages, setMessages] = useState<Message[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [selectedModel, setSelectedModel] = useState(
+		AVAILABLE_MODELS[0].value
+	);
+	const messageContainerRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+	// Scroll to bottom whenever messages change
+	useEffect(() => {
+		if (messageContainerRef.current) {
+			messageContainerRef.current.scrollTop =
+				messageContainerRef.current.scrollHeight;
+		}
+	}, [messages]);
+
+	const handleSendMessage = async (message: string) => {
+		// Add user message to the chat
+		const userMessage: Message = {
+			role: "user",
+			content: message,
+		};
+
+		setMessages((prev) => [...prev, userMessage]);
+		setIsLoading(true);
+
+		try {
+			// Send message to API with selected model
+			const response = await fetch("/api/chat", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					message,
+					model: selectedModel,
+				}),
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to get response");
+			}
+
+			const data = await response.json();
+
+			// Add AI response to the chat
+			const botMessage: Message = {
+				role: "assistant",
+				content:
+					data.message?.content ||
+					"Sorry, I could not generate a response.",
+			};
+
+			setMessages((prev) => [...prev, botMessage]);
+		} catch (error) {
+			console.error("Error fetching response:", error);
+			// Add error message
+			const errorMessage: Message = {
+				role: "assistant",
+				content: "Sorry, something went wrong. Please try again.",
+			};
+			setMessages((prev) => [...prev, errorMessage]);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const modelLabel =
+		AVAILABLE_MODELS.find((m) => m.value === selectedModel)?.label ||
+		selectedModel;
+
+	return (
+		<div className="min-h-screen bg-[var(--background)]">
+			<div className="chat-container">
+				<header className="p-4 flex items-center justify-between border-b border-[var(--border-color)]">
+					<div className="flex items-center gap-3">
+						<Image
+							src="/logo.png"
+							alt="Secured LLM"
+							width={40}
+							height={40}
+							className="rounded-logo"
+							priority
+						/>
+						<h1 className="text-2xl font-bold gradient-text">
+							Secured LLM
+						</h1>
+					</div>
+					<ModelSelector
+						selectedModel={selectedModel}
+						setSelectedModel={setSelectedModel}
+						models={AVAILABLE_MODELS}
+					/>
+				</header>
+
+				<div
+					ref={messageContainerRef}
+					className="message-container flex flex-col"
+				>
+					{messages.length === 0 ? (
+						<div className="flex flex-col items-center justify-center h-full text-center p-4">
+							<div className="glass-morphism p-8 max-w-md">
+								<div className="flex justify-center mb-4">
+									<Image
+										src="/logo.png"
+										alt="Secured LLM"
+										width={80}
+										height={80}
+										className="rounded-logo"
+									/>
+								</div>
+								<h2 className="text-xl font-bold mb-3 gradient-text">
+									Secure Private Chat
+								</h2>
+								<p className="text-[var(--foreground)] opacity-80 mb-2">
+									Start chatting with the {modelLabel} model
+									locally.
+								</p>
+								<p className="text-[var(--foreground)] opacity-60 text-sm">
+									Your conversation remains private and will
+									be lost when you refresh the page.
+								</p>
+							</div>
+						</div>
+					) : (
+						messages.map((message, index) => (
+							<ChatMessage
+								key={index}
+								content={message.content}
+								type={message.role}
+							/>
+						))
+					)}
+					{isLoading && (
+						<div className="bot-message">
+							<div className="flex space-x-2">
+								<div
+									className="w-2 h-2 rounded-full bg-[var(--accent-color)] animate-bounce"
+									style={{ animationDelay: "0ms" }}
+								></div>
+								<div
+									className="w-2 h-2 rounded-full bg-[var(--accent-color)] animate-bounce"
+									style={{ animationDelay: "150ms" }}
+								></div>
+								<div
+									className="w-2 h-2 rounded-full bg-[var(--accent-color)] animate-bounce"
+									style={{ animationDelay: "300ms" }}
+								></div>
+							</div>
+						</div>
+					)}
+				</div>
+
+				<ChatInput
+					onSendMessage={handleSendMessage}
+					isLoading={isLoading}
+				/>
+			</div>
+		</div>
+	);
 }
