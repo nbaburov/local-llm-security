@@ -143,7 +143,7 @@ export default function Home() {
 							<div className="glass-morphism p-8 max-w-md">
 								<div className="flex justify-center mb-4">
 									<Image
-										src="/logo.svg"
+										src="/logo.png"
 										alt="Secured LLM"
 										width={80}
 										height={80}
