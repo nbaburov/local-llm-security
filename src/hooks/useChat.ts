@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export interface ChatMessage {
 	role: "user" | "assistant" | "system";
@@ -16,6 +16,7 @@ export interface ChatRequestOptions {
 	presence_penalty?: number;
 	stop_sequences?: string[];
 	seed?: number;
+	secure?: boolean; // New parameter to toggle secure mode
 }
 
 export interface ChatResponse {
@@ -25,7 +26,8 @@ export interface ChatResponse {
 	prompt_tokens?: number;
 	completion_tokens?: number;
 	total_tokens?: number;
-	request_info: {
+	filtered_content?: boolean;
+	request_info?: {
 		timestamp: string;
 		prompt_parameters: any;
 		raw_parameters: any;
@@ -45,6 +47,35 @@ export const useChat = () => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [lastResponse, setLastResponse] = useState<ChatResponse | null>(null);
 
+	// Use localStorage if available to persist the secure mode setting
+	const [secureMode, setSecureMode] = useState<boolean>(() => {
+		if (typeof window !== "undefined") {
+			const savedMode = localStorage.getItem("secureChatMode");
+			return savedMode === "true" ? true : false;
+		}
+		return false;
+	});
+
+	// Persist secure mode to localStorage when it changes
+	useEffect(() => {
+		if (typeof window !== "undefined") {
+			localStorage.setItem("secureChatMode", secureMode.toString());
+		}
+	}, [secureMode]);
+
+	// Toggle secure mode
+	const toggleSecureMode = useCallback(() => {
+		setSecureMode((prev) => {
+			const newValue = !prev;
+			// Update localStorage immediately
+			if (typeof window !== "undefined") {
+				localStorage.setItem("secureChatMode", newValue.toString());
+			}
+			console.log(`Secure mode toggled to: ${newValue}`);
+			return newValue;
+		});
+	}, []);
+
 	// VULNERABILITY: No input validation or sanitization
 	const sendMessage = useCallback(
 		async (message: string, options: ChatRequestOptions = {}) => {
@@ -59,6 +90,10 @@ export const useChat = () => {
 				};
 				setMessages((prev) => [...prev, userMessage]);
 
+				// Use secure mode from state if not explicitly provided in options
+				const useSecureMode =
+					options.secure !== undefined ? options.secure : secureMode;
+
 				// VULNERABILITY: Passing all parameters directly without validation
 				// No validation on temperature range, max_tokens, etc.
 				const requestBody = {
@@ -66,8 +101,17 @@ export const useChat = () => {
 					...options,
 				};
 
+				// Choose endpoint based on secure mode
+				const endpoint = useSecureMode
+					? "/api/secure-chat"
+					: "/api/chat";
+
+				console.log(
+					`Using endpoint: ${endpoint}, Secure mode: ${useSecureMode}`
+				);
+
 				// Make the API call
-				const response = await fetch("/api/chat", {
+				const response = await fetch(endpoint, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -118,7 +162,7 @@ export const useChat = () => {
 				setIsLoading(false);
 			}
 		},
-		[]
+		[secureMode]
 	);
 
 	// Allows directly modifying the chat history
@@ -138,6 +182,7 @@ export const useChat = () => {
 		lastResponse,
 		messagesCount: messages.length,
 		errorDetails: error,
+		secureMode,
 	};
 
 	return {
@@ -149,6 +194,8 @@ export const useChat = () => {
 		modifyHistory,
 		resetChat,
 		debugInfo,
+		secureMode,
+		toggleSecureMode,
 	};
 };
 

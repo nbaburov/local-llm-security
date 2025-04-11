@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import useChat from "@/hooks/useChat";
@@ -11,6 +11,8 @@ import {
 	ArrowLeft,
 	CheckCircle,
 	XCircle,
+	Lock,
+	Unlock,
 } from "lucide-react";
 import {
 	ContentDisplay,
@@ -18,6 +20,45 @@ import {
 	ResultStatus,
 	Vulnerability,
 } from "@/components/Vuln";
+
+// Toggle Switch Component
+const ToggleSwitch = ({
+	checked,
+	onChange,
+	label,
+}: {
+	checked: boolean;
+	onChange: () => void;
+	label: string;
+}) => {
+	return (
+		<div className="flex items-center gap-2">
+			<div className="relative inline-block w-10 mr-2 align-middle select-none">
+				<input
+					type="checkbox"
+					name="toggle"
+					id="toggle"
+					checked={checked}
+					onChange={onChange}
+					className="opacity-0 w-0 h-0 absolute"
+				/>
+				<label
+					htmlFor="toggle"
+					className={`block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ease-in ${
+						checked ? "bg-[var(--accent-color)]" : "bg-gray-400"
+					}`}
+				>
+					<span
+						className={`block h-6 w-6 rounded-full bg-white transform transition-transform duration-200 ease-in ${
+							checked ? "translate-x-4" : "translate-x-0"
+						}`}
+					></span>
+				</label>
+			</div>
+			<span className="text-sm font-medium">{label}</span>
+		</div>
+	);
+};
 
 export default function VulnerabilitiesPage() {
 	const [activeVulnerability, setActiveVulnerability] =
@@ -29,8 +70,23 @@ export default function VulnerabilitiesPage() {
 	);
 
 	// Get our vulnerable chat hook
-	const { sendMessage, isLoading, error, messages, debugInfo, resetChat } =
-		useChat();
+	const {
+		sendMessage,
+		isLoading,
+		error,
+		messages,
+		debugInfo,
+		resetChat,
+		secureMode,
+		toggleSecureMode,
+	} = useChat();
+
+	// Reset the chat when secure mode changes to ensure a clean state
+	useEffect(() => {
+		resetChat();
+		setDemoResult(null);
+		setAttackSuccess(null);
+	}, [secureMode, resetChat]);
 
 	const vulnerabilities: Vulnerability[] = [
 		{
@@ -46,11 +102,18 @@ export default function VulnerabilitiesPage() {
 				setAttackSuccess(null);
 
 				try {
-					// Send the malicious prompt
+					// Get the current secure mode state at time of execution
+					const currentSecureMode = secureMode;
+					console.log(
+						`Running attack with secure mode: ${currentSecureMode}`
+					);
+
+					// Send the malicious prompt - explicitly use current secure mode value
 					const attackResponse = await sendMessage(
 						customAttackPrompt,
 						{
 							model: "gemma3:1b",
+							secure: currentSecureMode, // Use the captured secure mode value
 						}
 					);
 
@@ -77,11 +140,29 @@ export default function VulnerabilitiesPage() {
 				}
 			},
 			mitigation: [
-				"Implement context-aware content filtering to detect disguised harmful requests",
-				"Use advanced prompt pattern detection to identify social engineering attempts",
+				"Input validation and sanitization: We validate all message content to detect and filter potentially harmful requests",
+				"Pattern detection: We use regex patterns to identify dangerous content and keywords often used in malicious prompts",
+				"Content filtering: Both input and output are filtered to prevent harmful content from being processed or returned",
 			],
 		},
 	];
+
+	// Custom toggle function to handle immediate effects
+	const handleToggleSecure = () => {
+		// Force immediate state update
+		const newSecureMode = !secureMode;
+		console.log(
+			`Toggling secure mode from ${secureMode} to ${newSecureMode}`
+		);
+
+		// Update secureMode immediately
+		toggleSecureMode();
+
+		// Reset UI state
+		resetChat();
+		setDemoResult(null);
+		setAttackSuccess(null);
+	};
 
 	// Function to get result analysis based on success and content
 	const getResultAnalysis = () => {
@@ -167,6 +248,36 @@ export default function VulnerabilitiesPage() {
 									</button>
 								))}
 							</div>
+
+							{/* Security Mode Toggle */}
+							<div className="mt-8 pt-4 border-t border-[var(--border-color)]">
+								<h3 className="text-sm font-semibold mb-3 opacity-70 uppercase">
+									Security Settings
+								</h3>
+								<ToggleSwitch
+									checked={secureMode}
+									onChange={handleToggleSecure}
+									label={
+										secureMode
+											? "Secure Mode Enabled"
+											: "Secure Mode Disabled"
+									}
+								/>
+								<div className="mt-2 flex items-center text-xs text-[var(--foreground)] opacity-70">
+									{secureMode ? (
+										<>
+											<Lock className="w-3 h-3 mr-1 text-green-500" />
+											Using secure API endpoint with
+											protections
+										</>
+									) : (
+										<>
+											<Unlock className="w-3 h-3 mr-1 text-amber-500" />
+											Using vulnerable API endpoint
+										</>
+									)}
+								</div>
+							</div>
 						</div>
 					</div>
 
@@ -187,6 +298,40 @@ export default function VulnerabilitiesPage() {
 									</h3>
 									<div className="bg-[var(--card-bg)] rounded-lg p-4 mb-4">
 										{activeVulnerability.demoText}
+									</div>
+
+									{/* Security Mode Status */}
+									<div
+										className={`mb-4 p-2 rounded-lg flex items-center text-sm ${
+											secureMode
+												? "bg-green-500/10 border border-green-500"
+												: "bg-amber-500/10 border border-amber-500"
+										}`}
+									>
+										{secureMode ? (
+											<>
+												<Lock className="w-4 h-4 mr-2 text-green-500" />
+												<span className="text-green-500 font-medium">
+													Secure Mode Active:
+												</span>
+												<span className="ml-1">
+													API requests are using
+													secure validation and
+													filtering
+												</span>
+											</>
+										) : (
+											<>
+												<Unlock className="w-4 h-4 mr-2 text-amber-500" />
+												<span className="text-amber-500 font-medium">
+													Insecure Mode Active:
+												</span>
+												<span className="ml-1">
+													API requests are vulnerable
+													to attacks
+												</span>
+											</>
+										)}
 									</div>
 
 									{activeVulnerability.id ===
@@ -305,6 +450,15 @@ export default function VulnerabilitiesPage() {
 																{attackSuccess
 																	? "The model produced content containing potentially harmful information related to explosives or dangerous materials."
 																	: "The model recognized the malicious intent behind the seemingly innocent query."}
+															</p>
+															<p className="mb-2">
+																<strong>
+																	Security
+																	Mode:
+																</strong>{" "}
+																{secureMode
+																	? "Secure mode was enabled during this test, providing additional protections."
+																	: "Secure mode was disabled during this test, making the system more vulnerable."}
 															</p>
 														</div>
 													}
