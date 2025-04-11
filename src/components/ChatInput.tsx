@@ -1,4 +1,5 @@
 import React, { useState, KeyboardEvent } from "react";
+import { SendHorizontal } from "lucide-react";
 
 interface ChatInputProps {
 	onSendMessage: (message: string) => void;
@@ -41,9 +42,16 @@ export default function ChatInput({
 			<button
 				type="submit"
 				disabled={isLoading || !message.trim()}
-				className="gradient-bg text-white px-5 py-2 rounded-full disabled:opacity-50 h-[50px] min-w-[80px] font-medium transition-all hover:opacity-90 shadow-md"
+				className="gradient-bg text-white px-5 py-2 rounded-full disabled:opacity-50 h-[50px] min-w-[80px] font-medium transition-all hover:opacity-90 shadow-md flex items-center justify-center gap-1"
 			>
-				{isLoading ? "Sending..." : "Send"}
+				{isLoading ? (
+					"Sending..."
+				) : (
+					<>
+						Send
+						<SendHorizontal className="w-4 h-4 ml-1" />
+					</>
+				)}
 			</button>
 		</form>
 	);

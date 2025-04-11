@@ -1,4 +1,5 @@
 import React from "react";
+import { Cpu } from "lucide-react";
 
 interface ModelSelectorProps {
 	selectedModel: string;
@@ -13,7 +14,8 @@ export default function ModelSelector({
 }: ModelSelectorProps) {
 	return (
 		<div className="flex items-center gap-2">
-			<span className="text-sm text-[var(--foreground)] opacity-70">
+			<span className="text-sm text-[var(--foreground)] opacity-70 flex items-center">
+				<Cpu className="w-3 h-3 mr-1" />
 				Model:
 			</span>
 			<select

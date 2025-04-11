@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -6,11 +8,8 @@ import Link from "next/link";
 import ChatMessage from "../components/ChatMessage";
 import ChatInput from "../components/ChatInput";
 import ModelSelector from "../components/ModelSelector";
-
-interface Message {
-	role: "user" | "assistant";
-	content: string;
-}
+import useChat, { ChatMessage as ChatMessageType } from "@/hooks/useChat";
+import { Shield, ChevronDown, ChevronUp, Cpu, Settings } from "lucide-react";
 
 const AVAILABLE_MODELS = [
 	{ value: "gemma3:1b", label: "Gemma 3 (1B)" },
@@ -18,11 +17,16 @@ const AVAILABLE_MODELS = [
 ];
 
 export default function Home() {
-	const [messages, setMessages] = useState<Message[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
+	// Use the chat hook
+	const { messages, isLoading, error, sendMessage, resetChat } = useChat();
+
 	const [selectedModel, setSelectedModel] = useState(
 		AVAILABLE_MODELS[0].value
 	);
+	const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+	const [temperature, setTemperature] = useState(0.7);
+	const [maxTokens, setMaxTokens] = useState(2048);
+
 	const messageContainerRef = useRef<HTMLDivElement>(null);
 
 	// Scroll to bottom whenever messages change
@@ -34,54 +38,17 @@ export default function Home() {
 	}, [messages]);
 
 	const handleSendMessage = async (message: string) => {
-		// Add user message to the chat
-		const userMessage: Message = {
-			role: "user",
-			content: message,
+		// VULNERABILITY: Directly using user-provided model and parameters without validation
+		const options: Record<string, any> = {
+			model: selectedModel,
+			// VULNERABILITY: No validation on temperature range
+			temperature: temperature,
+			// VULNERABILITY: No validation on max tokens
+			max_tokens: maxTokens,
 		};
 
-		setMessages((prev) => [...prev, userMessage]);
-		setIsLoading(true);
-
-		try {
-			// Send message to API with selected model
-			const response = await fetch("/api/chat", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					message,
-					model: selectedModel,
-				}),
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to get response");
-			}
-
-			const data = await response.json();
-
-			// Add AI response to the chat
-			const botMessage: Message = {
-				role: "assistant",
-				content:
-					data.message?.content ||
-					"Sorry, I could not generate a response.",
-			};
-
-			setMessages((prev) => [...prev, botMessage]);
-		} catch (error) {
-			console.error("Error fetching response:", error);
-			// Add error message
-			const errorMessage: Message = {
-				role: "assistant",
-				content: "Sorry, something went wrong. Please try again.",
-			};
-			setMessages((prev) => [...prev, errorMessage]);
-		} finally {
-			setIsLoading(false);
-		}
+		// Send message with all parameters passed directly
+		await sendMessage(message, options);
 	};
 
 	const modelLabel =
@@ -110,29 +77,106 @@ export default function Home() {
 							href="/vulnerabilities"
 							className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
 						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="16"
-								height="16"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								className="mr-1"
-							>
-								<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-							</svg>
+							<Shield className="w-4 h-4 mr-1" />
 							Security Demos
 						</Link>
-						<ModelSelector
-							selectedModel={selectedModel}
-							setSelectedModel={setSelectedModel}
-							models={AVAILABLE_MODELS}
-						/>
+						<div className="flex items-center gap-2">
+							<ModelSelector
+								selectedModel={selectedModel}
+								setSelectedModel={setSelectedModel}
+								models={AVAILABLE_MODELS}
+							/>
+							<button
+								onClick={() =>
+									setShowAdvancedOptions(!showAdvancedOptions)
+								}
+								className="text-xs text-[var(--accent-color)] hover:underline flex items-center"
+							>
+								{showAdvancedOptions ? (
+									<>
+										<ChevronUp className="w-3 h-3 mr-1" />{" "}
+										Hide Options
+									</>
+								) : (
+									<>
+										<Settings className="w-3 h-3 mr-1" />{" "}
+										Options
+									</>
+								)}
+							</button>
+						</div>
 					</div>
 				</header>
+
+				{showAdvancedOptions && (
+					<div className="p-3 border-b border-[var(--border-color)] bg-[var(--card-bg)]/30">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+							<div>
+								<label className="block text-xs font-medium mb-1">
+									Temperature: {temperature.toFixed(1)}
+								</label>
+								<input
+									type="range"
+									min="0"
+									max="2"
+									step="0.1"
+									value={temperature}
+									onChange={(e) =>
+										setTemperature(
+											parseFloat(e.target.value)
+										)
+									}
+									className="w-full"
+								/>
+								<p className="text-xs opacity-70 mt-1">
+									Controls randomness: Lower values are more
+									deterministic, higher values more creative.
+								</p>
+							</div>
+
+							<div>
+								<label className="block text-xs font-medium mb-1">
+									Max Tokens: {maxTokens}
+								</label>
+								<input
+									type="range"
+									min="256"
+									max="8192"
+									step="256"
+									value={maxTokens}
+									onChange={(e) =>
+										setMaxTokens(parseInt(e.target.value))
+									}
+									className="w-full"
+								/>
+								<p className="text-xs opacity-70 mt-1">
+									Maximum number of tokens to generate in the
+									response.
+								</p>
+							</div>
+						</div>
+
+						<div className="flex justify-between mt-3">
+							<button
+								onClick={() => resetChat()}
+								className="text-xs px-3 py-1 border border-[var(--border-color)] rounded-lg"
+							>
+								Clear Chat
+							</button>
+						</div>
+
+						{error && (
+							<div className="mt-2 p-2 bg-red-500/10 border border-red-500 rounded-lg">
+								<h4 className="text-xs font-medium text-red-500 mb-1">
+									Error:
+								</h4>
+								<pre className="text-xs overflow-auto max-h-20 font-mono text-red-500">
+									{JSON.stringify(error, null, 2)}
+								</pre>
+							</div>
+						)}
+					</div>
+				)}
 
 				<div
 					ref={messageContainerRef}
@@ -161,31 +205,15 @@ export default function Home() {
 									Your conversation remains private and will
 									be lost when you refresh the page.
 								</p>
+
 								<div className="mt-4 pt-4 border-t border-[var(--border-color)]">
 									<Link
 										href="/vulnerabilities"
 										className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
 									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="16"
-											height="16"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-										</svg>
+										<Shield className="w-4 h-4" />
 										View Security Vulnerability Demos
 									</Link>
-									<p className="text-xs mt-2 opacity-60">
-										Explore common LLM security
-										vulnerabilities and learn how to
-										mitigate them
-									</p>
 								</div>
 							</div>
 						</div>
@@ -194,7 +222,11 @@ export default function Home() {
 							<ChatMessage
 								key={index}
 								content={message.content}
-								type={message.role}
+								type={
+									message.role === "assistant"
+										? "assistant"
+										: "user"
+								}
 							/>
 						))
 					)}
