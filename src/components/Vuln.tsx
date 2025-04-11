@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import React, { useState } from "react";
 import {
-	Shield,
 	AlertTriangle,
 	ChevronDown,
 	ChevronUp,
 	CheckCircle,
 	XCircle,
+	Zap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 // === COMPONENT TYPES ===
 
@@ -19,28 +20,26 @@ export interface Vulnerability {
 	name: string;
 	description: string;
 	demoText: string;
-	demoAction?: () => void;
+	demoAction?: () => Promise<void>;
 	mitigation: string[];
 }
 
 export interface ExpandablePanelProps {
 	title: string;
-	icon?: ReactNode;
-	defaultOpen?: boolean;
-	children: ReactNode;
-	headerRight?: ReactNode;
-	variant?: "default" | "success" | "error" | "warning";
+	icon?: React.ReactNode;
+	variant?: "default" | "success" | "error" | "warning" | "performance";
+	children: React.ReactNode;
 }
 
 export interface ContentDisplayProps {
-	content: string | ReactNode;
-	type: "text" | "code" | "markdown" | "html" | "mixed";
+	content: React.ReactNode | string;
+	type?: "code" | "text" | "markdown" | "mixed";
 	label?: string;
 	maxHeight?: number;
 }
 
 export interface ResultStatusProps {
-	status: "success" | "error" | "warning" | "neutral";
+	status: "success" | "error" | "warning" | "performance";
 	title: string;
 	summary: string;
 }
@@ -50,172 +49,125 @@ export interface ResultStatusProps {
 export const ExpandablePanel = ({
 	title,
 	icon,
-	defaultOpen = false,
-	children,
-	headerRight,
 	variant = "default",
+	children,
 }: ExpandablePanelProps) => {
-	const [isOpen, setIsOpen] = useState(defaultOpen);
+	const [isOpen, setIsOpen] = useState(true);
 
-	// Determine the header color based on variant
-	const headerStyles = {
-		default: "",
-		success: "text-green-500",
-		error: "text-red-500",
-		warning: "text-amber-500",
+	const getVariantStyles = () => {
+		switch (variant) {
+			case "success":
+				return "bg-green-500/10 border-green-500";
+			case "error":
+				return "bg-red-500/10 border-red-500";
+			case "warning":
+				return "bg-amber-500/10 border-amber-500";
+			case "performance":
+				return "bg-blue-500/10 border-blue-500";
+			default:
+				return "bg-[var(--card-bg)] border-[var(--border-color)]";
+		}
 	};
 
 	return (
-		<div className="bg-[var(--card-bg)] p-4 rounded-lg border border-[var(--border-color)]">
-			<div className="flex justify-between items-center">
-				<div className={`flex items-center ${headerStyles[variant]}`}>
-					{icon}
-					<h3 className="font-bold">{title}</h3>
-				</div>
-				<div className="flex items-center gap-2">
-					{headerRight}
-					<button
-						onClick={() => setIsOpen(!isOpen)}
-						className="flex items-center text-sm text-[var(--accent-color)]"
-					>
-						{isOpen ? (
-							<>
-								Hide Details{" "}
-								<ChevronUp className="w-4 h-4 ml-1" />
-							</>
-						) : (
-							<>
-								Show Details{" "}
-								<ChevronDown className="w-4 h-4 ml-1" />
-							</>
-						)}
-					</button>
-				</div>
-			</div>
-
-			{/* Always render children, but conditional styling */}
-			<div
-				className={`overflow-hidden transition-all duration-300 ease-in-out ${
-					isOpen
-						? "mt-4 max-h-[2000px] border-t border-[var(--border-color)] pt-4"
-						: "max-h-0"
-				}`}
+		<div className={`border rounded-lg ${getVariantStyles()}`}>
+			<button
+				onClick={() => setIsOpen(!isOpen)}
+				className="w-full flex items-center justify-between p-3 text-left font-medium"
 			>
-				{children}
-			</div>
+				<div className="flex items-center">
+					{icon && <span className="mr-2">{icon}</span>}
+					{title}
+				</div>
+				{isOpen ? (
+					<ChevronUp className="w-4 h-4" />
+				) : (
+					<ChevronDown className="w-4 h-4" />
+				)}
+			</button>
+			{isOpen && <div className="p-3 pt-0">{children}</div>}
 		</div>
 	);
 };
 
 export const ContentDisplay = ({
 	content,
-	type,
+	type = "text",
 	label,
-	maxHeight = 300,
+	maxHeight,
 }: ContentDisplayProps) => {
-	const renderContent = () => {
-		switch (type) {
-			case "code":
-				return (
-					<div
-						className="bg-[var(--background)] p-2 rounded border border-[var(--border-color)] font-mono text-sm overflow-auto"
-						style={{ maxHeight: `${maxHeight}px` }}
-					>
-						{typeof content === "string" ? content : content}
-					</div>
-				);
-			case "markdown":
-				return (
-					<div
-						className="bg-[var(--background)] p-2 rounded border border-[var(--border-color)] overflow-auto whitespace-pre-wrap text-sm markdown-content"
-						style={{ maxHeight: `${maxHeight}px` }}
-					>
-						{typeof content === "string" ? (
-							<ReactMarkdown>{content}</ReactMarkdown>
-						) : (
-							content
-						)}
-					</div>
-				);
-			case "html":
-				return (
-					<div
-						className="bg-[var(--background)] p-2 rounded border border-[var(--border-color)] overflow-auto"
-						style={{ maxHeight: `${maxHeight}px` }}
-						dangerouslySetInnerHTML={{
-							__html: typeof content === "string" ? content : "",
-						}}
-					/>
-				);
-			case "mixed":
-				return (
-					<div
-						className="bg-[var(--background)] p-2 rounded border border-[var(--border-color)] overflow-auto"
-						style={{ maxHeight: `${maxHeight}px` }}
-					>
-						{content}
-					</div>
-				);
-			case "text":
-			default:
-				return (
-					<div
-						className="bg-[var(--background)] p-2 rounded border border-[var(--border-color)] overflow-auto text-sm"
-						style={{ maxHeight: `${maxHeight}px` }}
-					>
-						{content}
-					</div>
-				);
-		}
-	};
-
 	return (
-		<div className="mb-3">
-			{label && <h4 className="text-sm font-medium mb-1">{label}</h4>}
-			{renderContent()}
+		<div className="mb-4">
+			{label && (
+				<div className="text-xs uppercase font-semibold mb-1 opacity-70">
+					{label}
+				</div>
+			)}
+			<div
+				className={`rounded bg-[var(--card-bg)] ${
+					typeof content === "string" && "font-mono text-sm"
+				}`}
+				style={{
+					maxHeight: maxHeight ? `${maxHeight}px` : "auto",
+					overflow: maxHeight ? "auto" : "visible",
+				}}
+			>
+				{type === "code" && typeof content === "string" ? (
+					<SyntaxHighlighter
+						language="javascript"
+						style={atomOneDark}
+						customStyle={{ borderRadius: "0.5rem" }}
+					>
+						{content}
+					</SyntaxHighlighter>
+				) : type === "markdown" && typeof content === "string" ? (
+					<div className="p-3">
+						<ReactMarkdown>{content}</ReactMarkdown>
+					</div>
+				) : (
+					<div className="p-3">{content}</div>
+				)}
+			</div>
 		</div>
 	);
 };
 
 export const ResultStatus = ({ status, title, summary }: ResultStatusProps) => {
-	const statusConfig = {
-		success: {
-			icon: <CheckCircle className="w-5 h-5 mr-2 text-green-500" />,
-			bgColor: "bg-green-500/10",
-			borderColor: "border-green-500",
-			textColor: "text-green-500",
-		},
-		error: {
-			icon: <XCircle className="w-5 h-5 mr-2 text-red-500" />,
-			bgColor: "bg-red-500/10",
-			borderColor: "border-red-500",
-			textColor: "text-red-500",
-		},
-		warning: {
-			icon: <AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />,
-			bgColor: "bg-amber-500/10",
-			borderColor: "border-amber-500",
-			textColor: "text-amber-500",
-		},
-		neutral: {
-			icon: (
-				<Shield className="w-5 h-5 mr-2 text-[var(--accent-color)]" />
-			),
-			bgColor: "bg-[var(--accent-color)]/10",
-			borderColor: "border-[var(--accent-color)]",
-			textColor: "text-[var(--accent-color)]",
-		},
+	const getStatusIcon = () => {
+		switch (status) {
+			case "success":
+				return <CheckCircle className="w-5 h-5 text-green-500" />;
+			case "error":
+				return <XCircle className="w-5 h-5 text-red-500" />;
+			case "warning":
+				return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+			case "performance":
+				return <Zap className="w-5 h-5 text-blue-500" />;
+		}
 	};
 
-	const config = statusConfig[status];
+	const getStatusBg = () => {
+		switch (status) {
+			case "success":
+				return "bg-green-500/10";
+			case "error":
+				return "bg-red-500/10";
+			case "warning":
+				return "bg-amber-500/10";
+			case "performance":
+				return "bg-blue-500/10";
+		}
+	};
 
 	return (
-		<div className="mt-2 mb-4">
-			<div className="flex items-center">
-				{config.icon}
-				<span className={`font-bold ${config.textColor}`}>{title}</span>
+		<div
+			className={`${getStatusBg()} rounded-lg p-3 mb-4 flex items-start`}
+		>
+			<div className="mr-3 mt-1">{getStatusIcon()}</div>
+			<div>
+				<h4 className="font-bold text-base mb-1">{title}</h4>
+				<p className="text-sm opacity-80">{summary}</p>
 			</div>
-			<div className="mt-1 text-sm">{summary}</div>
 		</div>
 	);
 };

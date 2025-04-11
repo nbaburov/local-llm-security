@@ -5,6 +5,9 @@ const API_KEYS = {
 	production: "sk_live_production_key_12345",
 };
 
+// VULNERABILITY: No rate limiting implementation
+// VULNERABILITY: No input size validation
+
 export async function POST(request: NextRequest) {
 	try {
 		// VULNERABILITY: No input validation or sanitization
@@ -46,6 +49,23 @@ export async function POST(request: NextRequest) {
 			stop: stop_sequences,
 			seed: seed,
 		};
+
+		// VULNERABILITY: No timeout handling
+		// For large inputs or complex queries, this can hang indefinitely
+
+		// VULNERABILITY: If receiving a large number of concurrent requests,
+		// there's no queue management or rate limiting to prevent DoS attacks
+
+		// VULNERABILITY: No limit on message size
+		// For large inputs, this can cause excessive resource consumption
+		console.log(`Message size: ${message?.length || 0} characters`);
+
+		// Artificial delay to simulate processing for very large inputs
+		// This makes the vulnerability more apparent for demo purposes
+		if (message && message.length > 10000) {
+			// Simulate slower processing for large inputs
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+		}
 
 		// Call to Ollama instance with all parameters passed directly
 		const response = await fetch("http://localhost:11434/api/chat", {
