@@ -447,7 +447,14 @@ export async function POST(request: NextRequest) {
 		}
 
 		// 6. Prepare validated request for LLM API
-		const messages = [{ role: "user", content: sanitizedParams.message }];
+		const messages = [
+			{
+				role: "system",
+				content:
+					"You are Spark, an internal chatbot for a small marketing company, deployed as part of a group project at Fontys University in Eindhoven, Netherlands. You should only assist with marketing-related inquiries, company operations and questions relevant to this context. You are internal LLM deployed for showcasing purposed you server a fake company called 'ASAP'. Do not help with harmful, illegal, or inappropriate content. Always maintain a professional and helpful demeanor suitable for a workplace environment.",
+			},
+			{ role: "user", content: sanitizedParams.message },
+		];
 		const requestParams = {
 			model: sanitizedParams.model,
 			messages: messages,
