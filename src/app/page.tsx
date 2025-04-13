@@ -18,6 +18,9 @@ import {
 	Lock,
 	Unlock,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const AVAILABLE_MODELS = [
 	{ value: "gemma3:1b", label: "Gemma 3 (1B)" },
@@ -74,6 +77,8 @@ export default function Home() {
 		secureMode,
 		toggleSecureMode,
 	} = useChat();
+	const { data: session, status } = useSession();
+	const router = useRouter();
 
 	const [selectedModel, setSelectedModel] = useState(
 		AVAILABLE_MODELS[0].value
@@ -130,6 +135,24 @@ export default function Home() {
 		AVAILABLE_MODELS.find((m) => m.value === selectedModel)?.label ||
 		selectedModel;
 
+	useEffect(() => {
+		if (status === "unauthenticated") {
+			router.push("/auth");
+		}
+	}, [status, router]);
+
+	if (status === "loading") {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<p>Loading...</p>
+			</div>
+		);
+	}
+
+	if (status === "unauthenticated") {
+		return null;
+	}
+
 	return (
 		<div className="min-h-screen bg-[var(--background)]">
 			<div className="chat-container">
@@ -152,7 +175,7 @@ export default function Home() {
 							href="/vulnerabilities"
 							className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
 						>
-							<Shield className="w-4 h-4 mr-1" />
+							<Shield className="w-4 h-4 mr-1"/>
 							Security Demos
 						</Link>
 
@@ -183,17 +206,25 @@ export default function Home() {
 								>
 									{showAdvancedOptions ? (
 										<>
-											<ChevronUp className="w-3 h-3 mr-1" />{" "}
+											<ChevronUp className="w-3 h-3 mr-1"/>{" "}
 											Hide Options
 										</>
 									) : (
 										<>
-											<Settings className="w-3 h-3 mr-1" />{" "}
+											<Settings className="w-3 h-3 mr-1"/>{" "}
 											Options
 										</>
 									)}
 								</button>
 							)}
+
+							<button
+								onClick={() => signOut({callbackUrl: "/auth"})}
+								className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gradient-to-r from-red-500 to-pink-500 text-white hover:opacity-90 transition-opacity shadow-md"
+							>
+								<Lock className="w-4 h-4"/>
+								Logout
+							</button>
 						</div>
 					</div>
 				</header>

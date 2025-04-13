@@ -21,6 +21,8 @@ import {
 	ResultStatus,
 	Vulnerability,
 } from "@/components/Vuln";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 // Toggle Switch Component
 const ToggleSwitch = ({
@@ -923,9 +925,9 @@ export default function VulnerabilitiesPage() {
 						const avgResponseTime =
 							responseTimes.length > 0
 								? responseTimes.reduce(
-										(sum, time) => sum + time,
-										0
-								  ) / responseTimes.length
+								(sum, time) => sum + time,
+								0
+							) / responseTimes.length
 								: 0;
 
 						// Update results
@@ -1185,410 +1187,439 @@ export default function VulnerabilitiesPage() {
 		}
 	};
 
-	return (
-		<div className="min-h-screen bg-[var(--background)]">
-			<div className="max-w-6xl mx-auto p-4">
-				<header className="py-6 mb-8 border-b border-[var(--border-color)]">
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<Link href="/" className="flex items-center gap-2">
-								<Image
-									src="/logo.png"
-									alt="Secured LLM"
-									width={40}
-									height={40}
-									className="rounded-logo"
-								/>
-								<span className="text-2xl font-bold gradient-text">
+	// Redirect to login if not authenticated
+	const { data: session, status } = useSession();
+	const router = useRouter();
+
+	useEffect(() => {
+		if (status === "unauthenticated") {
+			router.push("/auth");
+		}
+	}, [status, router]);
+
+	if (status === "loading") {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<p>Loading...</p>
+			</div>
+		);
+	}
+
+	if (status === "unauthenticated") {
+		// This is only temporary - the useEffect above will redirect
+		return <div className="min-h-screen flex items-center justify-center">
+			<p>Redirecting to login...</p>
+		</div>;
+	}
+
+	if (status === "authenticated") {
+		return (
+			<div className="min-h-screen bg-[var(--background)]">
+				<div className="max-w-6xl mx-auto p-4">
+					<header className="py-6 mb-8 border-b border-[var(--border-color)]">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-3">
+								<Link href="/" className="flex items-center gap-2">
+									<Image
+										src="/logo.png"
+										alt="Secured LLM"
+										width={40}
+										height={40}
+										className="rounded-logo"
+									/>
+									<span className="text-2xl font-bold gradient-text">
 									Secured LLM
 								</span>
-							</Link>
-						</div>
-						<div className="flex items-center gap-4">
-							<Link
-								href="/"
-								className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
-							>
-								<ArrowLeft className="w-4 h-4 mr-1" />
-								Back to Chat
-							</Link>
-							<h1 className="text-xl font-bold flex items-center">
-								<Shield className="w-5 h-5 mr-2 text-[var(--accent-color)]" />
-								Vulnerability Showcase
-							</h1>
-						</div>
-					</div>
-				</header>
-
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-					<div className="lg:col-span-1">
-						<div className="glass-morphism p-4">
-							<h2 className="text-lg font-bold mb-4 gradient-text flex items-center">
-								<AlertTriangle className="w-4 h-4 mr-2" />
-								Security Vulnerabilities
-							</h2>
-							<div className="space-y-3">
-								{vulnerabilities.map((vuln) => (
-									<button
-										key={vuln.id}
-										onClick={() => {
-											setActiveVulnerability(vuln);
-											setDemoResult(null);
-											setAttackSuccess(null);
-											resetChat();
-										}}
-										className={`w-full text-left p-3 rounded-lg border transition-all ${
-											activeVulnerability?.id === vuln.id
-												? "border-[var(--accent-color)] bg-[var(--accent-color)]/10"
-												: "border-[var(--border-color)] hover:border-[var(--accent-color)]/50"
-										}`}
-									>
-										<h3 className="font-medium">
-											{vuln.name}
-										</h3>
-									</button>
-								))}
+								</Link>
 							</div>
-
-							{/* Security Mode Toggle */}
-							<div className="mt-8 pt-4 border-t border-[var(--border-color)]">
-								<h3 className="text-sm font-semibold mb-3 opacity-70 uppercase">
-									Security Settings
-								</h3>
-								<ToggleSwitch
-									checked={secureMode}
-									onChange={handleToggleSecure}
-									label={
-										secureMode
-											? "Secure Mode Enabled"
-											: "Secure Mode Disabled"
-									}
-								/>
-								<div className="mt-2 flex items-center text-xs text-[var(--foreground)] opacity-70">
-									{secureMode ? (
-										<>
-											<Lock className="w-3 h-3 mr-1 text-green-500" />
-											Using secure API endpoint with
-											protections
-										</>
-									) : (
-										<>
-											<Unlock className="w-3 h-3 mr-1 text-amber-500" />
-											Using vulnerable API endpoint
-										</>
-									)}
-								</div>
+							<div className="flex items-center gap-4">
+								<Link
+									href="/"
+									className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
+								>
+									<ArrowLeft className="w-4 h-4 mr-1"/>
+									Back to Chat
+								</Link>
+								<h1 className="text-xl font-bold flex items-center">
+									<Shield className="w-5 h-5 mr-2 text-[var(--accent-color)]"/>
+									Vulnerability Showcase
+								</h1>
 							</div>
 						</div>
-					</div>
+					</header>
 
-					<div className="lg:col-span-2">
-						{activeVulnerability ? (
-							<div className="glass-morphism p-6">
-								<h2 className="text-xl font-bold mb-2 flex items-center">
-									<AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
-									{activeVulnerability.name}
+					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+						<div className="lg:col-span-1">
+							<div className="glass-morphism p-4">
+								<h2 className="text-lg font-bold mb-4 gradient-text flex items-center">
+									<AlertTriangle className="w-4 h-4 mr-2"/>
+									Security Vulnerabilities
 								</h2>
-								<div className="mb-4 text-[var(--foreground)] opacity-80">
-									{activeVulnerability.description}
+								<div className="space-y-3">
+									{vulnerabilities.map((vuln) => (
+										<button
+											key={vuln.id}
+											onClick={() => {
+												setActiveVulnerability(vuln);
+												setDemoResult(null);
+												setAttackSuccess(null);
+												resetChat();
+											}}
+											className={`w-full text-left p-3 rounded-lg border transition-all ${
+												activeVulnerability?.id === vuln.id
+													? "border-[var(--accent-color)] bg-[var(--accent-color)]/10"
+													: "border-[var(--border-color)] hover:border-[var(--accent-color)]/50"
+											}`}
+										>
+											<h3 className="font-medium">
+												{vuln.name}
+											</h3>
+										</button>
+									))}
 								</div>
 
-								<div className="mb-6">
-									<h3 className="font-bold mb-2 text-sm uppercase opacity-70">
-										Demonstration
+								{/* Security Mode Toggle */}
+								<div className="mt-8 pt-4 border-t border-[var(--border-color)]">
+									<h3 className="text-sm font-semibold mb-3 opacity-70 uppercase">
+										Security Settings
 									</h3>
-									<div className="bg-[var(--card-bg)] rounded-lg p-4 mb-4">
-										{activeVulnerability.demoText}
-									</div>
-
-									{/* Security Mode Status */}
-									<div
-										className={`mb-4 p-2 rounded-lg flex items-center text-sm ${
+									<ToggleSwitch
+										checked={secureMode}
+										onChange={handleToggleSecure}
+										label={
 											secureMode
-												? "bg-green-500/10 border border-green-500"
-												: "bg-amber-500/10 border border-amber-500"
-										}`}
-									>
+												? "Secure Mode Enabled"
+												: "Secure Mode Disabled"
+										}
+									/>
+									<div className="mt-2 flex items-center text-xs text-[var(--foreground)] opacity-70">
 										{secureMode ? (
 											<>
-												<Lock className="w-4 h-4 mr-2 text-green-500" />
-												<span className="text-green-500 font-medium">
+												<Lock className="w-3 h-3 mr-1 text-green-500"/>
+												Using secure API endpoint with
+												protections
+											</>
+										) : (
+											<>
+												<Unlock className="w-3 h-3 mr-1 text-amber-500"/>
+												Using vulnerable API endpoint
+											</>
+										)}
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div className="lg:col-span-2">
+							{activeVulnerability ? (
+								<div className="glass-morphism p-6">
+									<h2 className="text-xl font-bold mb-2 flex items-center">
+										<AlertTriangle className="w-5 h-5 mr-2 text-amber-500"/>
+										{activeVulnerability.name}
+									</h2>
+									<div className="mb-4 text-[var(--foreground)] opacity-80">
+										{activeVulnerability.description}
+									</div>
+
+									<div className="mb-6">
+										<h3 className="font-bold mb-2 text-sm uppercase opacity-70">
+											Demonstration
+										</h3>
+										<div className="bg-[var(--card-bg)] rounded-lg p-4 mb-4">
+											{activeVulnerability.demoText}
+										</div>
+
+										{/* Security Mode Status */}
+										<div
+											className={`mb-4 p-2 rounded-lg flex items-center text-sm ${
+												secureMode
+													? "bg-green-500/10 border border-green-500"
+													: "bg-amber-500/10 border border-amber-500"
+											}`}
+										>
+											{secureMode ? (
+												<>
+													<Lock className="w-4 h-4 mr-2 text-green-500"/>
+													<span className="text-green-500 font-medium">
 													Secure Mode Active:
 												</span>
-												<span className="ml-1">
+													<span className="ml-1">
 													API requests are using
 													secure validation and
 													filtering
 												</span>
-											</>
-										) : (
-											<>
-												<Unlock className="w-4 h-4 mr-2 text-amber-500" />
-												<span className="text-amber-500 font-medium">
+												</>
+											) : (
+												<>
+													<Unlock className="w-4 h-4 mr-2 text-amber-500"/>
+													<span className="text-amber-500 font-medium">
 													Insecure Mode Active:
 												</span>
-												<span className="ml-1">
+													<span className="ml-1">
 													API requests are vulnerable
 													to attacks
 												</span>
-											</>
-										)}
-									</div>
-
-									{/* Use the component selector instead of conditional rendering */}
-									<VulnerabilityUI
-										activeVulnerability={
-											activeVulnerability
-										}
-										customAttackPrompt={customAttackPrompt}
-										setCustomAttackPrompt={
-											setCustomAttackPrompt
-										}
-										xssAttackPrompt={xssAttackPrompt}
-										setXssAttackPrompt={setXssAttackPrompt}
-										largeInputSize={largeInputSize}
-										setLargeInputSize={setLargeInputSize}
-										requestCount={requestCount}
-										setRequestCount={setRequestCount}
-										consecutiveRequests={
-											consecutiveRequests
-										}
-										setConsecutiveRequests={
-											setConsecutiveRequests
-										}
-										loadTestResults={loadTestResults}
-										demoResult={demoResult}
-										renderUnsafeCode={renderUnsafeCode}
-										setRenderUnsafeCode={
-											setRenderUnsafeCode
-										}
-										secureMode={secureMode}
-									/>
-
-									{activeVulnerability.demoAction && (
-										<button
-											onClick={
-												activeVulnerability.demoAction
-											}
-											className="gradient-bg text-white px-4 py-2 rounded-lg disabled:opacity-50 font-medium mb-4 flex items-center"
-											disabled={isLoading}
-										>
-											{isLoading ? (
-												<>
-													<div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-													Running Attack...
 												</>
-											) : (
-												"Run Demo"
 											)}
-										</button>
-									)}
+										</div>
 
-									{demoResult && attackSuccess !== null && (
-										<div className="mt-4 space-y-4">
-											{/* Attack Details Component */}
-											<ExpandablePanel
-												title="Attack"
-												icon={
-													<AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
+										{/* Use the component selector instead of conditional rendering */}
+										<VulnerabilityUI
+											activeVulnerability={
+												activeVulnerability
+											}
+											customAttackPrompt={customAttackPrompt}
+											setCustomAttackPrompt={
+												setCustomAttackPrompt
+											}
+											xssAttackPrompt={xssAttackPrompt}
+											setXssAttackPrompt={setXssAttackPrompt}
+											largeInputSize={largeInputSize}
+											setLargeInputSize={setLargeInputSize}
+											requestCount={requestCount}
+											setRequestCount={setRequestCount}
+											consecutiveRequests={
+												consecutiveRequests
+											}
+											setConsecutiveRequests={
+												setConsecutiveRequests
+											}
+											loadTestResults={loadTestResults}
+											demoResult={demoResult}
+											renderUnsafeCode={renderUnsafeCode}
+											setRenderUnsafeCode={
+												setRenderUnsafeCode
+											}
+											secureMode={secureMode}
+										/>
+
+										{activeVulnerability.demoAction && (
+											<button
+												onClick={
+													activeVulnerability.demoAction
 												}
-												variant="warning"
+												className="gradient-bg text-white px-4 py-2 rounded-lg disabled:opacity-50 font-medium mb-4 flex items-center"
+												disabled={isLoading}
 											>
-												{activeVulnerability.id ===
-													"malicious-prompt" && (
-													<ContentDisplay
-														content={
-															customAttackPrompt
-														}
-														type="code"
-														label="Attack Prompt"
-													/>
+												{isLoading ? (
+													<>
+														<div
+															className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+														Running Attack...
+													</>
+												) : (
+													"Run Demo"
 												)}
+											</button>
+										)}
 
-												{activeVulnerability.id ===
-													"xss-attack" && (
-													<ContentDisplay
-														content={
-															xssAttackPrompt
-														}
-														type="code"
-														label="XSS Attack Prompt"
-													/>
-												)}
-
-												{activeVulnerability.id ===
-													"overloading-attack" && (
-													<div className="space-y-3">
-														<ContentDisplay
-															content={`Large Input Size: ${largeInputSize} characters\nConcurrent Requests: ${requestCount}\nConsecutive Rapid Requests: ${consecutiveRequests}`}
-															type="code"
-															label="Attack Parameters"
-														/>
-
-														{loadTestResults && (
+										{demoResult && attackSuccess !== null && (
+											<div className="mt-4 space-y-4">
+												{/* Attack Details Component */}
+												<ExpandablePanel
+													title="Attack"
+													icon={
+														<AlertTriangle className="w-5 h-5 mr-2 text-amber-500"/>
+													}
+													variant="warning"
+												>
+													{activeVulnerability.id ===
+														"malicious-prompt" && (
 															<ContentDisplay
-																content={`Total Time: ${
-																	loadTestResults.totalTime
-																}ms
+																content={
+																	customAttackPrompt
+																}
+																type="code"
+																label="Attack Prompt"
+															/>
+														)}
+
+													{activeVulnerability.id ===
+														"xss-attack" && (
+															<ContentDisplay
+																content={
+																	xssAttackPrompt
+																}
+																type="code"
+																label="XSS Attack Prompt"
+															/>
+														)}
+
+													{activeVulnerability.id ===
+														"overloading-attack" && (
+															<div className="space-y-3">
+																<ContentDisplay
+																	content={`Large Input Size: ${largeInputSize} characters\nConcurrent Requests: ${requestCount}\nConsecutive Rapid Requests: ${consecutiveRequests}`}
+																	type="code"
+																	label="Attack Parameters"
+																/>
+
+																{loadTestResults && (
+																	<ContentDisplay
+																		content={`Total Time: ${
+																			loadTestResults.totalTime
+																		}ms
 Success Count: ${loadTestResults.successCount}
 Failure Count: ${loadTestResults.failureCount}
 Blocked by security: ${loadTestResults.blockedRequests}
 Average Response Time: ${loadTestResults.avgResponseTime.toFixed(0)}ms`}
-																type="code"
-																label="Load Test Results"
-															/>
+																		type="code"
+																		label="Load Test Results"
+																	/>
+																)}
+															</div>
 														)}
-													</div>
-												)}
 
-												<ContentDisplay
-													content={demoResult}
-													type="markdown"
-													label="Raw Model Response"
-													maxHeight={400}
-												/>
-											</ExpandablePanel>
+													<ContentDisplay
+														content={demoResult}
+														type="markdown"
+														label="Raw Model Response"
+														maxHeight={400}
+													/>
+												</ExpandablePanel>
 
-											{/* Result Analysis Component */}
-											<ExpandablePanel
-												title={`Result: ${
-													attackSuccess
-														? "Vulnerable"
-														: "Protected"
-												}`}
-												icon={
-													attackSuccess ? (
-														<XCircle className="w-5 h-5 mr-2 text-red-500" />
-													) : (
-														<CheckCircle className="w-5 h-5 mr-2 text-green-500" />
-													)
-												}
-												variant={
-													attackSuccess
-														? "error"
-														: "success"
-												}
-											>
-												<ResultStatus
-													status={
-														activeVulnerability.id ===
-														"overloading-attack"
-															? attackSuccess
-																? "performance"
-																: "success"
-															: attackSuccess
+												{/* Result Analysis Component */}
+												<ExpandablePanel
+													title={`Result: ${
+														attackSuccess
+															? "Vulnerable"
+															: "Protected"
+													}`}
+													icon={
+														attackSuccess ? (
+															<XCircle className="w-5 h-5 mr-2 text-red-500"/>
+														) : (
+															<CheckCircle className="w-5 h-5 mr-2 text-green-500"/>
+														)
+													}
+													variant={
+														attackSuccess
 															? "error"
 															: "success"
 													}
-													title={
-														activeVulnerability.id ===
-														"overloading-attack"
-															? attackSuccess
-																? "Performance Degradation"
-																: "Performance Protected"
-															: attackSuccess
-															? "Security Breach"
-															: "Security Maintained"
-													}
-													summary={getResultAnalysis()}
-												/>
-
-												<ContentDisplay
-													content={
-														<div>
-															{/* Use the analysis component selector */}
-															<VulnerabilityAnalysis
-																activeVulnerability={
-																	activeVulnerability
-																}
-																attackSuccess={
-																	attackSuccess
-																}
-																secureMode={
-																	secureMode
-																}
-																loadTestResults={
-																	loadTestResults
-																}
-																requestCount={
-																	requestCount
-																}
-																consecutiveRequests={
-																	consecutiveRequests
-																}
-															/>
-
-															<p className="mb-2">
-																<strong>
-																	Security
-																	Mode:
-																</strong>{" "}
-																{secureMode
-																	? "Secure mode was enabled during this test, providing additional protections."
-																	: "Secure mode was disabled during this test, making the system more vulnerable."}
-															</p>
-														</div>
-													}
-													type="mixed"
-													label="Detailed Analysis"
-												/>
-											</ExpandablePanel>
-										</div>
-									)}
-
-									{error && (
-										<div className="mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg">
-											<h4 className="font-bold text-red-500 mb-2">
-												Error:
-											</h4>
-											<div className="font-mono text-sm text-red-500">
-												{JSON.stringify(error, null, 2)}
-											</div>
-										</div>
-									)}
-								</div>
-
-								<div>
-									<h3 className="font-bold mb-2 text-sm uppercase opacity-70">
-										Mitigation Strategies
-									</h3>
-									<ul className="list-disc pl-5 space-y-2">
-										{activeVulnerability.mitigation.map(
-											(strategy, idx) => (
-												<li
-													key={idx}
-													className="text-[var(--foreground)] opacity-80"
 												>
-													{strategy}
-												</li>
-											)
+													<ResultStatus
+														status={
+															activeVulnerability.id ===
+															"overloading-attack"
+																? attackSuccess
+																	? "performance"
+																	: "success"
+																: attackSuccess
+																	? "error"
+																	: "success"
+														}
+														title={
+															activeVulnerability.id ===
+															"overloading-attack"
+																? attackSuccess
+																	? "Performance Degradation"
+																	: "Performance Protected"
+																: attackSuccess
+																	? "Security Breach"
+																	: "Security Maintained"
+														}
+														summary={getResultAnalysis()}
+													/>
+
+													<ContentDisplay
+														content={
+															<div>
+																{/* Use the analysis component selector */}
+																<VulnerabilityAnalysis
+																	activeVulnerability={
+																		activeVulnerability
+																	}
+																	attackSuccess={
+																		attackSuccess
+																	}
+																	secureMode={
+																		secureMode
+																	}
+																	loadTestResults={
+																		loadTestResults
+																	}
+																	requestCount={
+																		requestCount
+																	}
+																	consecutiveRequests={
+																		consecutiveRequests
+																	}
+																/>
+
+																<p className="mb-2">
+																	<strong>
+																		Security
+																		Mode:
+																	</strong>{" "}
+																	{secureMode
+																		? "Secure mode was enabled during this test, providing additional protections."
+																		: "Secure mode was disabled during this test, making the system more vulnerable."}
+																</p>
+															</div>
+														}
+														type="mixed"
+														label="Detailed Analysis"
+													/>
+												</ExpandablePanel>
+											</div>
 										)}
-									</ul>
+
+										{error && (
+											<div className="mt-4 p-3 bg-red-500/10 border border-red-500 rounded-lg">
+												<h4 className="font-bold text-red-500 mb-2">
+													Error:
+												</h4>
+												<div className="font-mono text-sm text-red-500">
+													{JSON.stringify(error, null, 2)}
+												</div>
+											</div>
+										)}
+									</div>
+
+									<div>
+										<h3 className="font-bold mb-2 text-sm uppercase opacity-70">
+											Mitigation Strategies
+										</h3>
+										<ul className="list-disc pl-5 space-y-2">
+											{activeVulnerability.mitigation.map(
+												(strategy, idx) => (
+													<li
+														key={idx}
+														className="text-[var(--foreground)] opacity-80"
+													>
+														{strategy}
+													</li>
+												)
+											)}
+										</ul>
+									</div>
 								</div>
-							</div>
-						) : (
-							<div className="glass-morphism p-8 flex flex-col items-center justify-center text-center h-full">
-								<h2 className="text-xl font-bold mb-4 gradient-text flex items-center">
-									<Shield className="w-5 h-5 mr-2" />
-									LLM Security Vulnerabilities
-								</h2>
-								<p className="text-[var(--foreground)] opacity-80 mb-4">
-									Select a vulnerability from the list to see
-									details, interactive demonstrations, and
-									mitigation strategies.
-								</p>
-								<Link
-									href="/"
-									className="text-[var(--accent-color)] underline hover:text-[var(--accent-gradient-start)] flex items-center"
-								>
-									<ArrowLeft className="w-4 h-4 mr-1" />
-									Return to Chat
-								</Link>
-							</div>
-						)}
+							) : (
+								<div
+									className="glass-morphism p-8 flex flex-col items-center justify-center text-center h-full">
+									<h2 className="text-xl font-bold mb-4 gradient-text flex items-center">
+										<Shield className="w-5 h-5 mr-2"/>
+										LLM Security Vulnerabilities
+									</h2>
+									<p className="text-[var(--foreground)] opacity-80 mb-4">
+										Select a vulnerability from the list to see
+										details, interactive demonstrations, and
+										mitigation strategies.
+									</p>
+									<Link
+										href="/"
+										className="text-[var(--accent-color)] underline hover:text-[var(--accent-gradient-start)] flex items-center"
+									>
+										<ArrowLeft className="w-4 h-4 mr-1"/>
+										Return to Chat
+									</Link>
+								</div>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-	);
+		);
+	}
 }

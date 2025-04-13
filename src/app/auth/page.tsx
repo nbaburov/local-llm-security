@@ -1,9 +1,26 @@
 "use client";
 
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function AuthPage() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (status === "authenticated") {
+            router.push("/");
+        }
+    }, [status, router]);
+
+    if (status === "loading") {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-900 text-white">
+                <p>Loading...</p>
+            </div>
+        );
+    }
 
     if (!session) {
         return (
