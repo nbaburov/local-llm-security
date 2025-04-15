@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
+"use client";
+
 import { Geist, Geist_Mono } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,26 +14,18 @@ const geistMono = Geist_Mono({
 	subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-	title: "Secured LLM | Private Chat",
-	description: "Chat privately with local LLM models using Ollama deployment",
-	icons: {
-		icon: "/logo.png",
-	},
-};
-
 export default function RootLayout({
-	children,
-}: Readonly<{
+									   children,
+								   }: Readonly<{
 	children: React.ReactNode;
 }>) {
 	return (
 		<html lang="en" className="dark">
-			<body
-				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-			>
-				{children}
-			</body>
+		<body
+			className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+		>
+		<SessionProvider>{children}</SessionProvider>
+		</body>
 		</html>
 	);
 }
