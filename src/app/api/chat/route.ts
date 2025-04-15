@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Call to Ollama instance with all parameters passed directly
-		const response = await fetch("http://localhost:11434/api/chat", {
+		const response = await fetch(process.env.OLLAMA_URL || "", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

@@ -341,7 +341,7 @@ async function timeoutProtectedFetch(requestParams: any): Promise<any> {
 	const timeoutId = setTimeout(() => controller.abort(), MAX_REQUEST_TIMEOUT);
 
 	try {
-		const response = await fetch("http://localhost:11434/api/chat", {
+		const response = await fetch(process.env.OLLAMA_URL || "", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
