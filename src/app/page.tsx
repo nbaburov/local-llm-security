@@ -17,6 +17,7 @@ import {
 	Settings,
 	Lock,
 	Unlock,
+	HelpCircle,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -376,6 +377,13 @@ export default function Home() {
 										>
 											<Shield className="w-4 h-4" />
 											View Security Vulnerability Demos
+										</Link>
+										<Link
+											href="/secure-chat-demo"
+											className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
+										>
+											<HelpCircle className="w-4 h-4" />
+											View Secure Chat Demo
 										</Link>
 
 										<div className="flex justify-center pt-2">
