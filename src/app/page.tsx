@@ -220,7 +220,7 @@ export default function Home() {
 
 							<button
 								onClick={() => signOut({callbackUrl: "/auth"})}
-								className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gradient-to-r from-red-500 to-pink-500 text-white hover:opacity-90 transition-opacity shadow-md"
+								className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
 							>
 								<Lock className="w-4 h-4"/>
 								Logout
