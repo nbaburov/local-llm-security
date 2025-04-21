@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // ===================== TYPES =====================
 interface RateLimitEntry {
@@ -398,6 +400,17 @@ setInterval(() => {
 // ===================== MAIN ROUTE HANDLER =====================
 
 export async function POST(request: NextRequest) {
+	// Check authentication
+	const session = await getServerSession(authOptions);
+
+	// Reject if not authenticated
+	if (!session) {
+		return NextResponse.json(
+			{ error: "Authentication required for secure chat" },
+			{ status: 401 }
+		);
+	}
+
 	try {
 		// 1. Identify client - extract IP before any processing
 		const ip = extractClientIP(request);

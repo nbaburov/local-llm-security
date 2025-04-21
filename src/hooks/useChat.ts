@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export interface ChatMessage {
 	role: "user" | "assistant" | "system";
@@ -46,6 +47,7 @@ export const useChat = () => {
 	const [error, setError] = useState<ChatError | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [lastResponse, setLastResponse] = useState<ChatResponse | null>(null);
+	const router = useRouter();
 
 	// Use localStorage if available to persist the secure mode setting
 	const [secureMode, setSecureMode] = useState<boolean>(() => {
@@ -119,6 +121,15 @@ export const useChat = () => {
 					body: JSON.stringify(requestBody),
 				});
 
+				// Handle unauthorized response for secure mode
+				if (response.status === 401 && useSecureMode) {
+					// Redirect to auth page if not authenticated
+					router.push("/auth");
+					throw new Error(
+						"Authentication required for secure chat. Redirecting to login..."
+					);
+				}
+
 				// Handle non-OK responses
 				if (!response.ok) {
 					const errorData = await response.json();
@@ -162,7 +173,7 @@ export const useChat = () => {
 				setIsLoading(false);
 			}
 		},
-		[secureMode]
+		[secureMode, router]
 	);
 
 	// Allows directly modifying the chat history

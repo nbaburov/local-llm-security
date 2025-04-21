@@ -97,8 +97,14 @@ export default function Home() {
 		}
 	}, [messages]);
 
-	// Toggle secure mode with proper state management
+	// Toggle secure mode with proper state management and authentication check
 	const handleToggleSecure = () => {
+		// If enabling secure mode and not authenticated, redirect to auth
+		if (!secureMode && status !== "authenticated") {
+			router.push("/auth");
+			return;
+		}
+
 		const newSecureMode = !secureMode;
 		console.log(
 			`Toggling secure mode from ${secureMode} to ${newSecureMode}`
@@ -141,6 +147,13 @@ export default function Home() {
 		}
 	}, [status, router]);
 
+	// Redirect to auth page if secure mode is enabled but not authenticated
+	useEffect(() => {
+		if (secureMode && status === "unauthenticated") {
+			router.push("/auth");
+		}
+	}, [secureMode, status, router]);
+
 	if (status === "loading") {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
@@ -175,7 +188,7 @@ export default function Home() {
 							href="/vulnerabilities"
 							className="text-sm text-[var(--accent-color)] hover:underline flex items-center"
 						>
-							<Shield className="w-4 h-4 mr-1"/>
+							<Shield className="w-4 h-4 mr-1" />
 							Security Demos
 						</Link>
 
@@ -206,12 +219,12 @@ export default function Home() {
 								>
 									{showAdvancedOptions ? (
 										<>
-											<ChevronUp className="w-3 h-3 mr-1"/>{" "}
+											<ChevronUp className="w-3 h-3 mr-1" />{" "}
 											Hide Options
 										</>
 									) : (
 										<>
-											<Settings className="w-3 h-3 mr-1"/>{" "}
+											<Settings className="w-3 h-3 mr-1" />{" "}
 											Options
 										</>
 									)}
@@ -219,10 +232,12 @@ export default function Home() {
 							)}
 
 							<button
-								onClick={() => signOut({callbackUrl: "/auth"})}
+								onClick={() =>
+									signOut({ callbackUrl: "/auth" })
+								}
 								className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
 							>
-								<Lock className="w-4 h-4"/>
+								<Lock className="w-4 h-4" />
 								Logout
 							</button>
 						</div>
@@ -239,11 +254,13 @@ export default function Home() {
 						<div className="flex items-center text-green-500">
 							<Lock className="w-3 h-3 mr-1" />
 							Using secure API with content filtering
+							(authenticated mode)
 						</div>
 					) : (
 						<div className="flex items-center text-amber-500">
 							<Unlock className="w-3 h-3 mr-1" />
-							Using standard API without additional protections
+							Using standard API without authentication or
+							protections
 						</div>
 					)}
 				</div>
@@ -344,6 +361,11 @@ export default function Home() {
 								<p className="text-[var(--foreground)] opacity-60 text-sm">
 									Your conversation remains private and will
 									be lost when you refresh the page.
+								</p>
+								<p className="text-[var(--foreground)] opacity-60 text-sm mt-2">
+									{secureMode
+										? "Secure mode requires authentication and provides enhanced security."
+										: "Switch to secure mode for enhanced security (requires login)."}
 								</p>
 
 								<div className="mt-4 pt-4 border-t border-[var(--border-color)]">

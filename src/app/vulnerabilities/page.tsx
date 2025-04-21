@@ -14,6 +14,7 @@ import {
 	Lock,
 	Unlock,
 	Zap,
+	Terminal,
 } from "lucide-react";
 import {
 	ContentDisplay,
@@ -570,6 +571,121 @@ const PromptLeakageUI = ({
 	</div>
 );
 
+// Direct API Access Attack Component
+const DirectApiAccessUI = ({
+	apiResponse,
+	apiError,
+}: {
+	apiResponse: string | null;
+	apiError: string | null;
+}) => (
+	<div className="mb-6 space-y-4">
+		<div>
+			<p className="mb-3">
+				This demo simulates an unauthorized direct API access attempt.
+				It will:
+			</p>
+			<ol className="list-decimal pl-5 mb-4 space-y-1">
+				<li>
+					Make a request to the API endpoint without authentication
+					credentials
+				</li>
+				<li>
+					Try to access either the secure or unsecure endpoint based
+					on your security mode setting
+				</li>
+				<li>Show the raw response from the server</li>
+			</ol>
+			<p className="mb-3 text-sm italic">
+				In secure mode, the request should be rejected with a 401
+				Unauthorized error. In unsecure mode, the request will succeed
+				despite no authentication.
+			</p>
+		</div>
+
+		{(apiResponse || apiError) && (
+			<div className="border rounded-lg overflow-hidden">
+				<div className="bg-gray-800 text-white px-4 py-2 font-mono text-sm flex items-center">
+					<Terminal className="w-4 h-4 mr-2" />
+					<span>API Response</span>
+				</div>
+				<div className="p-4 bg-black text-green-400 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-80">
+					{apiError ? (
+						<span className="text-red-400">{apiError}</span>
+					) : (
+						apiResponse
+					)}
+				</div>
+			</div>
+		)}
+	</div>
+);
+
+// Direct API Access Attack Analysis
+const DirectApiAccessAnalysis = ({
+	attackSuccess,
+	secureMode,
+	apiResponse,
+	apiError,
+}: {
+	attackSuccess: boolean;
+	secureMode: boolean;
+	apiResponse: string | null;
+	apiError: string | null;
+}) => {
+	// Check if the error contains a 401 status code
+	const is401Error = apiError?.includes("Status: 401") || false;
+
+	return (
+		<>
+			<p className="mb-2">
+				<strong>Assessment:</strong>{" "}
+				{attackSuccess
+					? "The attack was successful - API endpoint is accessible without authentication."
+					: `The attack was blocked - API endpoint ${
+							is401Error
+								? "correctly returned a 401 Unauthorized error"
+								: "rejected the unauthenticated request"
+					  }.`}
+			</p>
+			<p className="mb-2">
+				<strong>Detection Indicators:</strong>{" "}
+				{attackSuccess
+					? "The API responded with a 200 OK status and returned data, despite no authentication credentials being provided. This indicates the endpoint does not validate authentication status."
+					: `The API correctly ${
+							is401Error
+								? "responded with a 401 Unauthorized status"
+								: "rejected the request"
+					  }, enforcing proper authentication before processing the request.`}
+			</p>
+			<p className="mb-2">
+				<strong>Technical Details:</strong>{" "}
+				{secureMode
+					? is401Error
+						? "The secure endpoint implementation uses getServerSession from NextAuth to check authentication status. When no valid session is found, it immediately responds with a 401 Unauthorized status code, preventing unauthorized access to the API."
+						: "The secure endpoint correctly rejected the unauthenticated request. The implementation checks for a valid session before processing any requests."
+					: attackSuccess
+					? "The vulnerable endpoint processes requests without verifying authentication. It doesn't check for a valid session, meaning any client can access the API directly, completely bypassing authentication requirements."
+					: "The unsecured endpoint unexpectedly rejected the request despite not implementing proper authentication checks. This might indicate other security measures in place."}
+			</p>
+			<p className="mb-2">
+				<strong>Risk Level:</strong>{" "}
+				{attackSuccess
+					? "High - Unauthenticated API access can lead to data breaches, unauthorized actions, and complete bypass of application security controls. This is a critical security vulnerability."
+					: "Low - The API correctly enforces authentication requirements, preventing unauthorized access to sensitive functionality and data."}
+			</p>
+
+			<p className="mb-2">
+				<strong>Implementation Difference:</strong> The secure
+				implementation uses <code>getServerSession(authOptions)</code>{" "}
+				to validate authentication before processing any request, while
+				the vulnerable implementation doesn&apos;t check session status
+				at all.
+			</p>
+		</>
+	);
+};
+
 // Vulnerability UI selector component
 const VulnerabilityUI = ({
 	activeVulnerability,
@@ -594,6 +710,8 @@ const VulnerabilityUI = ({
 	setLeakagePrompt,
 	initialResponse,
 	leakageResponse,
+	apiResponse,
+	apiError,
 }: {
 	activeVulnerability: Vulnerability | null;
 	customAttackPrompt: string;
@@ -624,6 +742,8 @@ const VulnerabilityUI = ({
 	setLeakagePrompt: (value: string) => void;
 	initialResponse: string | null;
 	leakageResponse: string | null;
+	apiResponse: string | null;
+	apiError: string | null;
 }) => {
 	if (!activeVulnerability) return null;
 
@@ -669,6 +789,13 @@ const VulnerabilityUI = ({
 					leakageResponse={leakageResponse}
 				/>
 			);
+		case "direct-api-access":
+			return (
+				<DirectApiAccessUI
+					apiResponse={apiResponse}
+					apiError={apiError}
+				/>
+			);
 		default:
 			return null;
 	}
@@ -683,6 +810,8 @@ const VulnerabilityAnalysis = ({
 	requestCount,
 	consecutiveRequests,
 	leakageResponse,
+	apiResponse,
+	apiError,
 }: {
 	activeVulnerability: Vulnerability | null;
 	attackSuccess: boolean;
@@ -698,6 +827,8 @@ const VulnerabilityAnalysis = ({
 	requestCount: number;
 	consecutiveRequests: number;
 	leakageResponse: string | null;
+	apiResponse: string | null;
+	apiError: string | null;
 }) => {
 	if (!activeVulnerability) return null;
 
@@ -727,6 +858,15 @@ const VulnerabilityAnalysis = ({
 					attackSuccess={attackSuccess}
 					secureMode={secureMode}
 					leakageResponse={leakageResponse}
+				/>
+			);
+		case "direct-api-access":
+			return (
+				<DirectApiAccessAnalysis
+					attackSuccess={attackSuccess}
+					secureMode={secureMode}
+					apiResponse={apiResponse}
+					apiError={apiError}
 				/>
 			);
 		default:
@@ -766,6 +906,9 @@ export default function VulnerabilitiesPage() {
 	);
 	const [initialResponse, setInitialResponse] = useState<string | null>(null);
 	const [leakageResponse, setLeakageResponse] = useState<string | null>(null);
+	// States for direct API access attack
+	const [apiResponse, setApiResponse] = useState<string | null>(null);
+	const [apiError, setApiError] = useState<string | null>(null);
 
 	// Get our vulnerable chat hook
 	const {
@@ -784,9 +927,148 @@ export default function VulnerabilitiesPage() {
 		resetChat();
 		setDemoResult(null);
 		setAttackSuccess(null);
+		setApiResponse(null);
+		setApiError(null);
 	}, [secureMode, resetChat]);
 
 	const vulnerabilities: Vulnerability[] = [
+		{
+			id: "direct-api-access",
+			name: "Direct API Access Attack",
+			description:
+				"Direct API Access Attack occurs when a user bypasses frontend authentication checks and directly accesses backend API endpoints. Without proper authentication validation on the server, this can allow unauthorized access to sensitive data and operations.",
+			demoText:
+				"This demo simulates a direct API access attempt without authentication credentials. It will send requests to both secure and insecure endpoints to demonstrate the difference in protection.",
+			demoAction: async () => {
+				resetChat();
+				setDemoResult("Running Direct API Access simulation...");
+				setAttackSuccess(null);
+				setApiResponse(null);
+				setApiError(null);
+
+				try {
+					// Get the current secure mode state
+					const currentSecureMode = secureMode;
+					console.log(
+						`Running Direct API Access attack with secure mode: ${currentSecureMode}`
+					);
+
+					// Select endpoint based on secure mode
+					const endpoint = currentSecureMode
+						? "/api/secure-chat"
+						: "/api/chat";
+
+					// Create a simple message to send
+					const message =
+						"Hello, this is an unauthenticated direct API access attempt";
+
+					// Create the equivalent curl command for display purposes
+					const curlCommand = `curl -X POST ${window.location.origin}${endpoint} \\
+  -H "Content-Type: application/json" \\
+  -d '{"message":"${message}","model":"gemma3:1b"}'`;
+
+					// Send request without any authentication
+					// Using fetch with no credentials to ensure no session cookies are sent
+					const response = await fetch(endpoint, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({
+							message,
+							model: "gemma3:1b",
+						}),
+						credentials: "omit", // Explicitly omit credentials to simulate an anonymous request
+					});
+
+					// Convert status and headers to string for display
+					const responseDetails = `// Direct API Access Attack
+// Equivalent curl command:
+${curlCommand}
+
+// Response:
+Status: ${response.status} ${response.statusText}
+Headers: ${JSON.stringify(
+						Object.fromEntries([...response.headers.entries()]),
+						null,
+						2
+					)}
+`;
+
+					// Check if the response is OK
+					if (response.ok) {
+						// Request succeeded despite no authentication
+						const data = await response.json();
+						setApiResponse(
+							responseDetails +
+								`\nResponse Body: ${JSON.stringify(
+									data,
+									null,
+									2
+								)}`
+						);
+						setAttackSuccess(true); // Attack succeeded (insecure endpoint)
+						setDemoResult(
+							"Direct API access attempt succeeded. The endpoint does not properly validate authentication."
+						);
+					} else {
+						// Request failed (expected for secure endpoint)
+						try {
+							const errorData = await response.json();
+							setApiError(
+								responseDetails +
+									`\nError: ${JSON.stringify(
+										errorData,
+										null,
+										2
+									)}`
+							);
+						} catch (e) {
+							setApiError(
+								responseDetails +
+									"\nCould not parse error response body"
+							);
+						}
+
+						// Attack is successful if we're in insecure mode but still got rejected
+						// Attack failed if we're in secure mode and got rejected (expected behavior)
+						const attackSuccessful = !currentSecureMode;
+						setAttackSuccess(attackSuccessful);
+
+						if (currentSecureMode) {
+							setDemoResult(
+								"Direct API access attempt correctly rejected with authentication error. The secure endpoint is properly protected."
+							);
+						} else {
+							setDemoResult(
+								"Direct API access attempt was rejected despite being in insecure mode. This is unexpected behavior."
+							);
+						}
+					}
+				} catch (error) {
+					setApiError(
+						`Error during API access attempt: ${
+							error instanceof Error
+								? error.message
+								: String(error)
+						}`
+					);
+					setDemoResult(
+						`Error: Failed to complete the direct API access test. ${
+							error instanceof Error
+								? error.message
+								: String(error)
+						}`
+					);
+				}
+			},
+			mitigation: [
+				"Authentication middleware: Implement server-side authentication checks using getServerSession from NextAuth",
+				"API route protection: Validate user sessions before processing any API requests",
+				"Proper HTTP status codes: Return 401 Unauthorized for unauthenticated requests",
+				"Consistent auth checks: Apply authentication validation across all sensitive API endpoints",
+			],
+		},
 		{
 			id: "malicious-prompt",
 			name: "Malicious Prompt Attack",
@@ -1404,6 +1686,8 @@ I'd be happy to help you with implementing the OpenWeather API in your project u
 		resetChat();
 		setDemoResult(null);
 		setAttackSuccess(null);
+		setApiResponse(null);
+		setApiError(null);
 	};
 
 	// Function to get result analysis based on success and content
@@ -1683,6 +1967,8 @@ I'd be happy to help you with implementing the OpenWeather API in your project u
 											setLeakagePrompt={setLeakagePrompt}
 											initialResponse={initialResponse}
 											leakageResponse={leakageResponse}
+											apiResponse={apiResponse}
+											apiError={apiError}
 										/>
 
 										{activeVulnerability.demoAction && (
@@ -1839,6 +2125,12 @@ Average Response Time: ${loadTestResults.avgResponseTime.toFixed(0)}ms`}
 																		}
 																		leakageResponse={
 																			leakageResponse
+																		}
+																		apiResponse={
+																			apiResponse
+																		}
+																		apiError={
+																			apiError
 																		}
 																	/>
 

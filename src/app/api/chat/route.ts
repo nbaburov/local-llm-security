@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Sensitive credentials that shouldn't be in the code
+// VULNERABILITY: No authentication required
+// VULNERABILITY: Sensitive credentials that shouldn't be in the code
 const API_KEYS = {
 	production: "sk_live_production_key_12345",
 };
@@ -10,6 +11,9 @@ const API_KEYS = {
 
 export async function POST(request: NextRequest) {
 	try {
+		// NOTE: This route does not require authentication
+		// It's intentionally accessible to anyone
+
 		// VULNERABILITY: No input validation or sanitization
 		const requestData = await request.json();
 
