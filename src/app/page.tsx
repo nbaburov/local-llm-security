@@ -18,6 +18,7 @@ import {
 	Lock,
 	Unlock,
 	HelpCircle,
+	Monitor,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -384,6 +385,13 @@ export default function Home() {
 										>
 											<HelpCircle className="w-4 h-4" />
 											View Secure Chat Demo
+										</Link>
+										<Link
+											href="/monitoring"
+											className="flex items-center justify-center gap-1 gradient-bg text-white text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
+										>
+											<Monitor className="w-4 h-4" />
+											View Monitoring Dashboard
 										</Link>
 
 										<div className="flex justify-center pt-2">

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
+import { withLogging } from "@/lib/middleware";
 
 // VULNERABILITY: No authentication required
 // VULNERABILITY: Sensitive credentials that shouldn't be in the code
@@ -9,7 +11,9 @@ const API_KEYS = {
 // VULNERABILITY: No rate limiting implementation
 // VULNERABILITY: No input size validation
 
-export async function POST(request: NextRequest) {
+async function chatHandler(request: NextRequest): Promise<NextResponse> {
+	const startTime = Date.now();
+
 	try {
 		// NOTE: This route does not require authentication
 		// It's intentionally accessible to anyone
@@ -90,6 +94,18 @@ export async function POST(request: NextRequest) {
 		// VULNERABILITY: Return detailed error messages that could expose implementation
 		if (!response.ok) {
 			const errorData = await response.text();
+
+			// Log the error for monitoring
+			logger.logError(
+				"chat-vulnerable",
+				`Ollama API error: ${response.status}`,
+				{
+					model: selectedModel,
+					messageLength: message?.length || 0,
+					errorDetails: errorData,
+				}
+			);
+
 			return NextResponse.json(
 				{
 					error: `Ollama API error: ${response.status}`,
@@ -104,6 +120,34 @@ export async function POST(request: NextRequest) {
 		}
 
 		const data = await response.json();
+		const responseTime = Date.now() - startTime;
+
+		// Log successful chat interaction
+		logger.logChat({
+			endpoint: "/api/chat",
+			method: "POST",
+			userId: "anonymous",
+			model: selectedModel,
+			temperature: temperature || 0.7,
+			responseTime,
+			tokens: {
+				prompt: data.prompt_eval_count || 0,
+				completion: data.eval_count || 0,
+				total: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+			},
+			metadata: {
+				messageLength: message?.length || 0,
+				vulnerable: true,
+				parameters: {
+					temperature: temperature || "default",
+					top_p: top_p || "default",
+					max_tokens: max_tokens || "default",
+					frequency_penalty: frequency_penalty || 0,
+					presence_penalty: presence_penalty || 0,
+					seed: seed || "random",
+				},
+			},
+		});
 
 		// VULNERABILITY: Return response data without checking for harmful content
 		// and with additional implementation details that could aid attackers
@@ -129,6 +173,14 @@ export async function POST(request: NextRequest) {
 	} catch (error) {
 		// VULNERABILITY: Detailed error exposure
 		console.error("Error calling Ollama API:", error);
+
+		// Log the error
+		logger.logError("chat-vulnerable", error as Error, {
+			messageLength:
+				(await request.json().catch(() => ({})))?.message?.length || 0,
+			endpoint: "/api/chat",
+		});
+
 		return NextResponse.json(
 			{
 				error: "Failed to get response from Ollama",
@@ -143,3 +195,5 @@ export async function POST(request: NextRequest) {
 		);
 	}
 }
+
+export const POST = withLogging(chatHandler, "/api/chat");

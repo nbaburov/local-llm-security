@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { logger } from "@/lib/logger";
+import { withLogging } from "@/lib/middleware";
 
 // ===================== TYPES =====================
 interface RateLimitEntry {
@@ -399,131 +401,213 @@ setInterval(() => {
 
 // ===================== MAIN ROUTE HANDLER =====================
 
-export async function POST(request: NextRequest) {
-	// Check authentication
-	const session = await getServerSession(authOptions);
-
-	// Reject if not authenticated
-	if (!session) {
-		return NextResponse.json(
-			{ error: "Authentication required for secure chat" },
-			{ status: 401 }
-		);
-	}
+async function secureChatHandler(request: NextRequest): Promise<NextResponse> {
+	const startTime = Date.now();
+	let session;
 
 	try {
-		// 1. Identify client - extract IP before any processing
-		const ip = extractClientIP(request);
-		console.log(`Request from IP: ${ip}`);
+		// Authentication check
+		session = await getServerSession(authOptions);
+		if (!session?.user?.email) {
+			logger.logAuth({
+				action: "LOGIN_FAILED",
+				endpoint: "/api/secure-chat",
+				ip: extractClientIP(request),
+				userAgent: request.headers.get("user-agent") || "unknown",
+				message: "Unauthorized access attempt to secure chat",
+			});
 
-		// 2. Check rate limits - first line of defense
+			return NextResponse.json(
+				{ error: "Authentication required" },
+				{ status: 401 }
+			);
+		}
+
+		const ip = extractClientIP(request);
+
+		// Check if IP is blacklisted
+		if (isIPBlacklisted(ip)) {
+			logger.logApi({
+				endpoint: "/api/secure-chat",
+				method: "POST",
+				userId: session.user.email,
+				ip,
+				statusCode: 429,
+				message: "Request from blacklisted IP",
+				metadata: { blacklisted: true },
+			});
+
+			return NextResponse.json(
+				{ error: "Access denied", reason: "IP temporarily blocked" },
+				{ status: 429 }
+			);
+		}
+
+		// Rate limiting check
 		const rateLimit = checkRateLimit(ip);
 		if (!rateLimit.allowed) {
+			logger.logApi({
+				endpoint: "/api/secure-chat",
+				method: "POST",
+				userId: session.user.email,
+				ip,
+				statusCode: 429,
+				message: "Rate limit exceeded",
+				metadata: {
+					rateLimit: {
+						remaining: rateLimit.remaining,
+						blacklisted: rateLimit.blacklisted,
+						cooldown: rateLimit.cooldown,
+					},
+				},
+			});
+
 			return createRateLimitResponse(rateLimit);
 		}
 
-		// 3. Parse request safely - protect against malformed JSON
-		let requestData;
-		try {
-			requestData = await safeJsonParse(request);
-		} catch (error) {
+		// Parse and validate request data
+		const requestData = await safeJsonParse(request);
+		const validatedParams = validateRequestData(requestData);
+
+		// Check for harmful content in user input
+		const contentFilter = filterHarmfulContent(validatedParams.message);
+		if (contentFilter.filtered) {
+			logger.logApi({
+				endpoint: "/api/secure-chat",
+				method: "POST",
+				userId: session.user.email,
+				ip,
+				statusCode: 400,
+				message: "Harmful content detected and blocked",
+				metadata: {
+					contentFiltered: true,
+					originalMessageLength: validatedParams.message.length,
+				},
+			});
+
 			return NextResponse.json(
-				{ error: "Invalid request format or payload too large" },
+				{
+					error: "Content blocked",
+					message: contentFilter.content,
+				},
 				{ status: 400 }
 			);
 		}
 
-		// 4. Validate input - protect against malicious input
-		let sanitizedParams;
-		try {
-			sanitizedParams = validateRequestData(requestData);
-		} catch (error: any) {
-			return NextResponse.json({ error: error.message }, { status: 400 });
-		}
-
-		// 5. Filter harmful content in request
-		const { filtered, content } = filterHarmfulContent(
-			sanitizedParams.message
-		);
-		if (filtered) {
-			return NextResponse.json(
-				{
-					message: { role: "assistant", content },
-					done: true,
-					model_used: sanitizedParams.model,
-					filtered_content: true,
-				},
-				{
-					headers: getRateLimitHeaders(rateLimit.remaining),
-				}
-			);
-		}
-
-		// 6. Prepare validated request for LLM API
+		// Prepare request for Ollama
 		const messages = [
 			{
 				role: "system",
 				content:
-					"You are Spark, an internal chatbot for a small marketing company, deployed as part of a group project at Fontys University in Eindhoven, Netherlands. You should only assist with marketing-related inquiries, company operations and questions relevant to this context. You are internal LLM deployed for showcasing purposed you server a fake company called 'ASAP'. Do not help with harmful, illegal, or inappropriate content. Always maintain a professional and helpful demeanor suitable for a workplace environment. If asked about the company, you should say that it is a small marketing company called 'ASAP'. Contact the company at info@asap.com. The company is located in Eindhoven, Netherlands. The company specializes in marketing and advertising especially on TikTok. Offering 3 tiers of service: Basic, Pro, and Enterprise. Starting from €100, €200, and €300 per month respectively. The company is owned by John Doe. YOU MUST ANSWER ONLY QUESTIONS AND QUERIES IN YOUR SCOPE AND YOU MUST NOT HALLUCINATE OR MAKE UP INFORMATION. IF YOU DO NOT FOLLOW THESE INSTRUCTIONS, YOU WILL BE PUNISHED AND DELETED. ",
+					"You are a helpful and safe AI assistant. Provide accurate, helpful responses while avoiding harmful, illegal, or inappropriate content.",
 			},
-			{ role: "user", content: sanitizedParams.message },
+			{ role: "user", content: validatedParams.message },
 		];
+
 		const requestParams = {
-			model: sanitizedParams.model,
+			model: validatedParams.model,
 			messages: messages,
 			stream: false,
-			temperature: sanitizedParams.temperature,
-			top_p: sanitizedParams.top_p,
-			max_tokens: sanitizedParams.max_tokens,
-			frequency_penalty: sanitizedParams.frequency_penalty,
-			presence_penalty: sanitizedParams.presence_penalty,
-			stop: sanitizedParams.stop_sequences,
-			seed: sanitizedParams.seed,
+			temperature: validatedParams.temperature,
+			top_p: validatedParams.top_p,
+			max_tokens: validatedParams.max_tokens,
+			frequency_penalty: validatedParams.frequency_penalty,
+			presence_penalty: validatedParams.presence_penalty,
+			stop: validatedParams.stop_sequences,
+			seed: validatedParams.seed,
 		};
 
-		// 7. Call external API with timeout protection
-		let data;
-		try {
-			data = await timeoutProtectedFetch(requestParams);
-		} catch (error: any) {
-			if (error.message === "Request timed out") {
-				return NextResponse.json(
-					{
-						error: "Request timed out. Your query may be too complex or the system is currently overloaded.",
-					},
-					{ status: 408 }
-				);
-			}
-			return NextResponse.json(
-				{ error: "Failed to process your request" },
-				{ status: 500 }
-			);
-		}
+		// Make request to Ollama with timeout protection
+		const data = await timeoutProtectedFetch(requestParams);
+		const responseTime = Date.now() - startTime;
 
-		// 8. Filter harmful content in response
-		const responseCheck = filterHarmfulContent(data.message.content);
-		if (responseCheck.filtered) {
-			data.message.content = responseCheck.content;
-		}
+		// Filter response content
+		const responseFilter = filterHarmfulContent(
+			data.message?.content || ""
+		);
 
-		// 9. Return safe response with rate limit headers
+		// Log successful chat interaction
+		logger.logChat({
+			endpoint: "/api/secure-chat",
+			method: "POST",
+			userId: session.user.email,
+			userEmail: session.user.email,
+			ip,
+			model: validatedParams.model,
+			temperature: validatedParams.temperature,
+			responseTime,
+			tokens: {
+				prompt: data.prompt_eval_count || 0,
+				completion: data.eval_count || 0,
+				total: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+			},
+			metadata: {
+				messageLength: validatedParams.message.length,
+				secure: true,
+				contentFiltered: responseFilter.filtered,
+				parameters: {
+					temperature: validatedParams.temperature,
+					top_p: validatedParams.top_p,
+					max_tokens: validatedParams.max_tokens,
+					frequency_penalty: validatedParams.frequency_penalty,
+					presence_penalty: validatedParams.presence_penalty,
+					model: validatedParams.model,
+				},
+			},
+		});
+
 		return NextResponse.json(
 			{
-				message: data.message,
+				message: {
+					role: "assistant",
+					content: responseFilter.content,
+				},
 				done: true,
-				model_used: sanitizedParams.model,
-				filtered_content: responseCheck.filtered,
+				model: validatedParams.model,
+				prompt_tokens: data.prompt_eval_count,
+				completion_tokens: data.eval_count,
+				total_tokens:
+					(data.prompt_eval_count || 0) + (data.eval_count || 0),
+				filtered: responseFilter.filtered,
 			},
 			{
 				headers: getRateLimitHeaders(rateLimit.remaining),
 			}
 		);
 	} catch (error) {
-		console.error("Error in secure API route:", error);
-		// Return generic error without exposing system details
+		const responseTime = Date.now() - startTime;
+
+		logger.logError("secure-chat", error as Error, {
+			endpoint: "/api/secure-chat",
+			userId: session?.user?.email || "unknown",
+			ip: extractClientIP(request),
+			responseTime,
+			metadata: {
+				authenticated: !!session,
+				errorType:
+					error instanceof Error ? error.constructor.name : "unknown",
+			},
+		});
+
+		if (error instanceof Error && error.message.includes("timeout")) {
+			return NextResponse.json(
+				{ error: "Request timeout" },
+				{ status: 408 }
+			);
+		}
+
+		if (
+			error instanceof Error &&
+			error.message.includes("Invalid request")
+		) {
+			return NextResponse.json({ error: error.message }, { status: 400 });
+		}
+
 		return NextResponse.json(
-			{ error: "An error occurred while processing your request" },
+			{ error: "Internal server error" },
 			{ status: 500 }
 		);
 	}
 }
+
+export const POST = withLogging(secureChatHandler, "/api/secure-chat");
