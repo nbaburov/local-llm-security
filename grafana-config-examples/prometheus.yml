@@ -1,0 +1,23 @@
+# Prometheus configuration for NextJS LLM Application monitoring
+# Copy this file and update the values according to your environment
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # NextJS LLM Application metrics
+  - job_name: 'nextjs-llm-app'
+    static_configs:
+      - targets: ['localhost:3000']  # Update with your app URL
+    metrics_path: '/api/metrics/prometheus'
+    authorization:
+      credentials: 'your-secure-api-key-here'  # Replace with your GRAFANA_API_KEY
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+    
+  # Optional: Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090'] 

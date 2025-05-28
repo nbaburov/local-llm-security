@@ -1,0 +1,35 @@
+# Grafana Agent configuration for NextJS LLM Application
+# This configuration is for Grafana Cloud integration
+# Copy this file and update the values according to your Grafana Cloud instance
+
+integrations:
+  prometheus_remote_write:
+  - basic_auth:
+      password: <your_grafana_cloud_api_key>  # Your Grafana Cloud API key
+      username: <your_grafana_cloud_user_id>  # Your Grafana Cloud user ID
+    url: <your_grafana_cloud_prometheus_url>  # Your Grafana Cloud Prometheus URL
+
+metrics:
+  configs:
+  - name: integrations
+    remote_write:
+    - basic_auth:
+        password: <your_grafana_cloud_api_key>
+        username: <your_grafana_cloud_user_id>
+      url: <your_grafana_cloud_prometheus_url>
+    scrape_configs:
+    # NextJS LLM Application metrics
+    - job_name: integrations/nodejs
+      static_configs:
+        - targets: ['localhost:3000']  # Update with your app URL
+      metrics_path: '/api/metrics/prometheus'
+      authorization:
+        credentials: 'your-secure-api-key-here'  # Replace with your GRAFANA_API_KEY
+      relabel_configs:
+        - replacement: 'nextjs-llm-production'  # Update with your instance name
+          target_label: instance
+      scrape_interval: 60s
+      scrape_timeout: 10s
+  global:
+    scrape_interval: 60s
+  wal_directory: /tmp/grafana-agent-wal

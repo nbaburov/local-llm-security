@@ -86,6 +86,23 @@ class Logger {
 			const logLine = JSON.stringify(logEvent) + "\n";
 			writeFileSync(filePath, logLine, { flag: "a" });
 
+			// Update Prometheus metrics
+			if (typeof window === "undefined") {
+				// Only on server side
+				try {
+					// Use dynamic import to avoid circular dependencies
+					import("./metrics")
+						.then(({ metricsCollector }) => {
+							metricsCollector.updatePrometheusMetrics(logEvent);
+						})
+						.catch(() => {
+							// Ignore metrics update errors to prevent circular dependencies
+						});
+				} catch {
+					// Ignore metrics update errors to prevent circular dependencies
+				}
+			}
+
 			// Also log to console in development
 			if (process.env.NODE_ENV === "development") {
 				console.log(

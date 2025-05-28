@@ -1,6 +1,60 @@
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { LogEvent, AuthLogEvent, ChatLogEvent } from "./logger";
+import {
+	register,
+	collectDefaultMetrics,
+	Counter,
+	Gauge,
+	Histogram,
+} from "prom-client";
+
+// Initialize Prometheus metrics
+collectDefaultMetrics({ register });
+
+// Custom metrics for our application
+const httpRequestsTotal = new Counter({
+	name: "http_requests_total",
+	help: "Total number of HTTP requests",
+	labelNames: ["method", "endpoint", "status_code"],
+	registers: [register],
+});
+
+const httpRequestDuration = new Histogram({
+	name: "http_request_duration_seconds",
+	help: "Duration of HTTP requests in seconds",
+	labelNames: ["method", "endpoint"],
+	buckets: [0.1, 0.5, 1, 2, 5],
+	registers: [register],
+});
+
+const authEventsTotal = new Counter({
+	name: "auth_events_total",
+	help: "Total number of authentication events",
+	labelNames: ["action", "provider"],
+	registers: [register],
+});
+
+const chatMessagesTotal = new Counter({
+	name: "chat_messages_total",
+	help: "Total number of chat messages",
+	labelNames: ["model"],
+	registers: [register],
+});
+
+const chatTokensTotal = new Counter({
+	name: "chat_tokens_total",
+	help: "Total number of tokens used in chat",
+	labelNames: ["model", "type"],
+	registers: [register],
+});
+
+const activeUsers = new Gauge({
+	name: "active_users_total",
+	help: "Number of active users",
+	labelNames: ["timeframe"],
+	registers: [register],
+});
 
 export interface ApiMetrics {
 	totalRequests: number;
@@ -296,6 +350,72 @@ class MetricsCollector {
 			chat_unique_users: metrics.chat.uniqueChatUsers,
 			timestamp: new Date().toISOString(),
 		};
+	}
+
+	// Update Prometheus metrics from log events
+	updatePrometheusMetrics(logEvent: LogEvent): void {
+		try {
+			if (
+				logEvent.service === "api" &&
+				logEvent.endpoint &&
+				logEvent.method
+			) {
+				httpRequestsTotal
+					.labels(
+						logEvent.method,
+						logEvent.endpoint,
+						logEvent.statusCode?.toString() || "unknown"
+					)
+					.inc();
+
+				if (logEvent.responseTime) {
+					httpRequestDuration
+						.labels(logEvent.method, logEvent.endpoint)
+						.observe(logEvent.responseTime / 1000); // Convert to seconds
+				}
+			}
+
+			if (logEvent.service === "auth") {
+				const authEvent = logEvent as AuthLogEvent;
+				authEventsTotal
+					.labels(
+						authEvent.action || "unknown",
+						authEvent.provider || "unknown"
+					)
+					.inc();
+			}
+
+			if (logEvent.service === "chat") {
+				const chatEvent = logEvent as ChatLogEvent;
+				chatMessagesTotal.labels(chatEvent.model || "unknown").inc();
+
+				if (chatEvent.tokens) {
+					chatTokensTotal
+						.labels(chatEvent.model || "unknown", "prompt")
+						.inc(chatEvent.tokens.prompt);
+					chatTokensTotal
+						.labels(chatEvent.model || "unknown", "completion")
+						.inc(chatEvent.tokens.completion);
+				}
+			}
+		} catch (error) {
+			console.warn("Failed to update Prometheus metrics:", error);
+		}
+	}
+
+	// Get Prometheus metrics string
+	async getPrometheusMetrics(): Promise<string> {
+		try {
+			// Update active users gauge
+			const metrics = this.getMetrics(1); // Last 24 hours
+			activeUsers.labels("24h").set(metrics.api.uniqueUsers);
+			activeUsers.labels("chat").set(metrics.chat.uniqueChatUsers);
+
+			return await register.metrics();
+		} catch (error) {
+			console.error("Failed to generate Prometheus metrics:", error);
+			return "";
+		}
 	}
 }
 

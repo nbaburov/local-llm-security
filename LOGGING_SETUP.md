@@ -7,7 +7,7 @@ This guide explains how to set up and use the comprehensive logging and monitori
 -   ✅ **Centralized Logging**: All API requests, authentication events, and chat interactions
 -   ✅ **Real-time Metrics**: Performance monitoring with response times and error rates
 -   ✅ **Standalone Dashboard**: Built-in monitoring interface at `/monitoring`
--   ✅ **Grafana Integration**: Prometheus-compatible metrics export
+-   ✅ **Grafana Integration**: Full Prometheus-compatible metrics export with API key auth
 -   ✅ **Log Rotation**: Automatic file management with size limits
 -   ✅ **Security Tracking**: Failed login attempts and suspicious activity
 
@@ -26,208 +26,287 @@ This guide explains how to set up and use the comprehensive logging and monitori
 │  Chat Activity  │───▶│ Chat Handler │           │
 └─────────────────┘    └──────────────┘           ▼
                                            ┌─────────────┐
+                                           │ Prometheus  │
                                            │  Metrics    │
-                                           │ Aggregator  │
+                                           │ (prom-client)│
                                            └─────────────┘
                                                    │
                               ┌────────────────────┼────────────────────┐
                               ▼                    ▼                    ▼
                     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
                     │  Dashboard  │     │  API JSON   │     │ Prometheus  │
-                    │ /monitoring │     │ /api/metrics│     │ /api/metrics│
-                    └─────────────┘     └─────────────┘     │?format=prom │
+                    │ /monitoring │     │ /api/metrics│     │/api/metrics/│
+                    └─────────────┘     └─────────────┘     │ prometheus  │
                                                            └─────────────┘
 ```
 
 ## Quick Start
 
-### 1. Files Already Created
+### 1. Install Dependencies
+
+```bash
+npm install prom-client
+```
+
+### 2. Environment Configuration
+
+Create a `.env.local` file with:
+
+```bash
+# Grafana Metrics API Key
+# This key is used for Grafana to access the /api/metrics endpoints
+# Change this to a secure random string in production
+GRAFANA_API_KEY=your-secure-api-key-here
+
+# Optional: Other logging configuration
+LOG_LEVEL=info
+LOG_RETENTION_DAYS=30
+```
+
+### 3. Files Already Created
 
 The logging system includes these new files:
 
--   `src/lib/logger.ts` - Core logging functionality
+-   `src/lib/logger.ts` - Core logging functionality with Prometheus integration
 -   `src/lib/middleware.ts` - Request/response logging middleware
--   `src/lib/metrics.ts` - Metrics aggregation and analysis
--   `src/app/api/metrics/route.ts` - Metrics API endpoint
+-   `src/lib/metrics.ts` - Metrics aggregation with prom-client integration
+-   `src/app/api/metrics/route.ts` - Main metrics API endpoint
+-   `src/app/api/metrics/prometheus/route.ts` - Dedicated Prometheus endpoint
 -   `src/app/monitoring/page.tsx` - Standalone dashboard
 
-### 2. Existing Files Modified
-
-Updated to include logging:
-
--   `src/app/api/auth/[...nextauth]/route.ts` - Authentication logging
--   `src/app/api/chat/route.ts` - Chat usage logging
--   `src/app/api/secure-chat/route.ts` - Secure chat logging
-
-### 3. Automatic Setup
+### 4. Automatic Setup
 
 The logging system will automatically:
 
 -   Create a `logs/` directory in your project root
 -   Generate daily log files in JSONL format
+-   Update Prometheus metrics in real-time
 -   Rotate log files when they exceed 50MB
 -   Keep the last 10 rotated files per log type
 
-### 4. Log File Structure
-
-```
-logs/
-├── api-2024-01-15.jsonl      # API request logs
-├── auth-2024-01-15.jsonl     # Authentication logs
-├── chat-2024-01-15.jsonl     # Chat interaction logs
-├── error-2024-01-15.jsonl    # Error logs
-└── general-2024-01-15.jsonl  # General application logs
-```
-
-## Usage
-
-### Standalone Monitoring Dashboard
-
-1. **Access**: Navigate to `/monitoring` in your application
-2. **Authentication**: Must be logged in to view metrics
-3. **Features**:
-    - Real-time metrics with 30-second auto-refresh
-    - Configurable time ranges (1, 7, or 30 days)
-    - API performance metrics
-    - Authentication statistics
-    - Chat usage analytics
-    - Error tracking
-
-### API Endpoints
-
-#### GET /api/metrics
-
-Returns comprehensive system metrics in JSON format.
-
-**Query Parameters:**
-
--   `days` (1-30): Time range for metrics (default: 7)
--   `realtime` (true/false): Get last-hour metrics only
--   `format` (json|grafana|prometheus): Output format
-
-**Examples:**
-
-```bash
-# Standard metrics
-curl -H "Authorization: Bearer <token>" \
-  "http://localhost:3000/api/metrics?days=7"
-
-# Grafana-compatible format
-curl -H "Authorization: Bearer <token>" \
-  "http://localhost:3000/api/metrics?format=grafana"
-
-# Prometheus metrics
-curl -H "Authorization: Bearer <token>" \
-  "http://localhost:3000/api/metrics?format=prometheus"
-```
-
 ## Grafana Integration
 
-### Option 1: HTTP Data Source (Recommended)
+### Authentication Methods
 
-1. **Add HTTP Data Source** in Grafana:
+The system supports **API key authentication** for Grafana, eliminating the need for session-based auth:
 
-    ```
-    URL: http://your-app-domain/api/metrics
-    Auth: Custom Headers
-    Header: Authorization: Bearer <your-session-token>
-    ```
-
-2. **Create Dashboard** with queries like:
+1. **Authorization Header** (Recommended):
 
     ```
-    # Total API Requests
-    ${__from:date:YYYY-MM-DD}&${__to:date:YYYY-MM-DD}&format=grafana
-
-    # Error Rate Panel
-    Select "api_error_rate" field from the JSON response
+    Authorization: Bearer your-secure-api-key-here
     ```
 
-### Option 2: Prometheus Integration
-
-1. **Configure Prometheus** to scrape metrics:
-
-    ```yaml
-    # prometheus.yml
-    scrape_configs:
-        - job_name: "nextjs-llm"
-          static_configs:
-              - targets: ["your-app-domain"]
-          metrics_path: "/api/metrics"
-          params:
-              format: ["prometheus"]
-          bearer_token: "your-session-token"
-          scrape_interval: 30s
+2. **Query Parameter** (Alternative):
+    ```
+    /api/metrics/prometheus?api_key=your-secure-api-key-here
     ```
 
-2. **Connect Grafana** to your Prometheus instance
+### Setup Options
 
-### Option 3: File-based (Advanced)
+#### Option 1: Prometheus + Grafana (Recommended)
 
-1. **Setup Log Forwarding**:
+This is the standard approach following Grafana's Node.js integration pattern.
 
-    ```bash
-    # Example with Promtail for Loki
-    tail -f logs/*.jsonl | promtail --config.file=promtail.yml
-    ```
+**Step 1: Configure Prometheus**
 
-2. **Configure Loki Data Source** in Grafana
+Create `prometheus.yml`:
 
-## Sample Grafana Dashboard
+```yaml
+global:
+    scrape_interval: 30s
 
-```json
-{
-	"dashboard": {
-		"title": "LLM Application Monitoring",
-		"panels": [
-			{
-				"title": "API Requests",
-				"type": "stat",
-				"targets": [
-					{
-						"expr": "api_total_requests",
-						"legendFormat": "Total Requests"
-					}
-				]
-			},
-			{
-				"title": "Response Time",
-				"type": "graph",
-				"targets": [
-					{
-						"expr": "api_avg_response_time",
-						"legendFormat": "Avg Response Time (ms)"
-					}
-				]
-			},
-			{
-				"title": "Error Rate",
-				"type": "singlestat",
-				"targets": [
-					{
-						"expr": "api_error_rate",
-						"legendFormat": "Error Rate (%)"
-					}
-				]
-			},
-			{
-				"title": "Chat Activity",
-				"type": "graph",
-				"targets": [
-					{
-						"expr": "chat_messages_total",
-						"legendFormat": "Chat Messages"
-					}
-				]
-			}
-		]
-	}
-}
+scrape_configs:
+    - job_name: "nextjs-llm-app"
+      static_configs:
+          - targets: ["localhost:3000"] # Your app URL
+      metrics_path: "/api/metrics/prometheus"
+      authorization:
+          credentials: "your-secure-api-key-here" # Your GRAFANA_API_KEY
+      scrape_interval: 30s
+      scrape_timeout: 10s
 ```
 
-## Metrics Reference
+**Step 2: Run Prometheus**
 
-### API Metrics
+```bash
+# Download and run Prometheus
+wget https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.darwin-amd64.tar.gz
+tar xvfz prometheus-*.tar.gz
+cd prometheus-*
+./prometheus --config.file=prometheus.yml
+```
+
+**Step 3: Configure Grafana**
+
+1. Add Prometheus data source in Grafana:
+
+    ```
+    URL: http://localhost:9090
+    Access: Server (default)
+    ```
+
+2. Import dashboard or create panels with queries like:
+
+    ```promql
+    # HTTP Request Rate
+    rate(http_requests_total[5m])
+
+    # Response Time 95th Percentile
+    histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+    # Error Rate
+    rate(http_requests_total{status_code=~"4..|5.."}[5m]) / rate(http_requests_total[5m])
+
+    # Active Users
+    active_users_total
+
+    # Chat Messages
+    rate(chat_messages_total[5m])
+    ```
+
+#### Option 2: Direct HTTP Data Source
+
+For simpler setups without Prometheus:
+
+**Step 1: Add HTTP Data Source in Grafana**
+
+```
+Name: NextJS LLM Metrics
+URL: http://your-app-domain/api/metrics
+Auth: Custom Headers
+Header Name: Authorization
+Header Value: Bearer your-secure-api-key-here
+```
+
+**Step 2: Create Dashboard Panels**
+
+Use JSON path queries:
+
+```
+# Total Requests
+$.data.api.totalRequests
+
+# Error Rate
+$.data.api.errorRate
+
+# Response Time
+$.data.api.averageResponseTime
+```
+
+#### Option 3: Grafana Agent (Cloud/Enterprise)
+
+For Grafana Cloud integration:
+
+**Step 1: Install Grafana Agent**
+
+```bash
+# macOS
+brew install grafana-agent
+
+# Linux
+wget https://github.com/grafana/agent/releases/latest/download/grafana-agent-linux-amd64.zip
+```
+
+**Step 2: Configure Agent**
+
+Create `agent.yml`:
+
+```yaml
+integrations:
+    prometheus_remote_write:
+        - basic_auth:
+              password: <your_grafana_cloud_token>
+              username: <your_grafana_cloud_user>
+          url: <your_grafana_cloud_prometheus_url>
+
+metrics:
+    configs:
+        - name: integrations
+          remote_write:
+              - basic_auth:
+                    password: <your_grafana_cloud_token>
+                    username: <your_grafana_cloud_user>
+                url: <your_grafana_cloud_prometheus_url>
+          scrape_configs:
+              - job_name: integrations/nodejs
+                static_configs:
+                    - targets: ["localhost:3000"]
+                metrics_path: "/api/metrics/prometheus"
+                authorization:
+                    credentials: "your-secure-api-key-here"
+                relabel_configs:
+                    - replacement: "your-instance-name"
+                      target_label: instance
+    global:
+        scrape_interval: 60s
+```
+
+**Step 3: Run Agent**
+
+```bash
+grafana-agent --config.file=agent.yml
+```
+
+### Security Configuration
+
+#### API Key Management
+
+1. **Generate Secure Key**:
+
+    ```bash
+    # Generate a secure random key
+    openssl rand -hex 32
+    ```
+
+2. **Set Environment Variable**:
+
+    ```bash
+    # In .env.local
+    GRAFANA_API_KEY=your-generated-secure-key
+    ```
+
+3. **Rotate Keys Regularly**:
+    - Update the key in your environment
+    - Update Grafana/Prometheus configuration
+    - Restart services
+
+#### Network Security
+
+1. **Firewall Rules**: Restrict access to metrics endpoints
+2. **HTTPS**: Use TLS in production
+3. **Rate Limiting**: Consider adding rate limits to metrics endpoints
+
+## Available Metrics
+
+### Prometheus Metrics (Standard Format)
+
+The system exports these Prometheus-compatible metrics:
+
+#### HTTP Metrics
+
+-   `http_requests_total{method, endpoint, status_code}` - Total HTTP requests
+-   `http_request_duration_seconds{method, endpoint}` - Request duration histogram
+
+#### Authentication Metrics
+
+-   `auth_events_total{action, provider}` - Authentication events counter
+
+#### Chat Metrics
+
+-   `chat_messages_total{model}` - Chat messages counter
+-   `chat_tokens_total{model, type}` - Token usage counter
+
+#### System Metrics
+
+-   `active_users_total{timeframe}` - Active users gauge
+-   `nodejs_*` - Standard Node.js metrics (memory, CPU, etc.)
+-   `process_*` - Process metrics
+
+### Custom Dashboard Metrics (JSON Format)
+
+Access via `/api/metrics?format=json`:
+
+#### API Metrics
 
 -   `totalRequests`: Total number of API requests
 -   `averageResponseTime`: Mean response time in milliseconds
@@ -236,7 +315,7 @@ curl -H "Authorization: Bearer <token>" \
 -   `requestsByEndpoint`: Request count per API endpoint
 -   `statusCodes`: Distribution of HTTP response codes
 
-### Authentication Metrics
+#### Authentication Metrics
 
 -   `totalLogins`: Successful authentication attempts
 -   `failedLogins`: Failed authentication attempts
@@ -244,7 +323,7 @@ curl -H "Authorization: Bearer <token>" \
 -   `loginsByProvider`: Login distribution by OAuth provider
 -   `averageSessionsPerUser`: Average logins per user
 
-### Chat Metrics
+#### Chat Metrics
 
 -   `totalChats`: Total chat interactions
 -   `totalTokens`: Sum of all tokens used
@@ -253,6 +332,176 @@ curl -H "Authorization: Bearer <token>" \
 -   `uniqueChatUsers`: Distinct users who have used chat
 -   `averageResponseTime`: Mean chat response time
 
+## Sample Grafana Dashboard
+
+### Dashboard JSON Template
+
+```json
+{
+	"dashboard": {
+		"title": "LLM Application Monitoring",
+		"tags": ["nodejs", "llm", "monitoring"],
+		"panels": [
+			{
+				"title": "HTTP Request Rate",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(http_requests_total[5m])",
+						"legendFormat": "{{method}} {{endpoint}}"
+					}
+				]
+			},
+			{
+				"title": "Response Time P95",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+						"legendFormat": "95th Percentile"
+					}
+				]
+			},
+			{
+				"title": "Error Rate",
+				"type": "singlestat",
+				"targets": [
+					{
+						"expr": "rate(http_requests_total{status_code=~\"4..|5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+						"legendFormat": "Error Rate %"
+					}
+				]
+			},
+			{
+				"title": "Active Users",
+				"type": "stat",
+				"targets": [
+					{
+						"expr": "active_users_total{timeframe=\"24h\"}",
+						"legendFormat": "24h Active Users"
+					}
+				]
+			},
+			{
+				"title": "Chat Activity",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "rate(chat_messages_total[5m])",
+						"legendFormat": "Messages/sec"
+					}
+				]
+			},
+			{
+				"title": "Memory Usage",
+				"type": "graph",
+				"targets": [
+					{
+						"expr": "nodejs_heap_size_used_bytes / 1024 / 1024",
+						"legendFormat": "Heap Used (MB)"
+					}
+				]
+			}
+		]
+	}
+}
+```
+
+### Alert Rules
+
+Create these alert rules in Grafana:
+
+```yaml
+# High Error Rate
+- alert: HighErrorRate
+  expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+  for: 2m
+  labels:
+      severity: warning
+  annotations:
+      summary: "High error rate detected"
+
+# High Response Time
+- alert: HighResponseTime
+  expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+  for: 5m
+  labels:
+      severity: warning
+  annotations:
+      summary: "High response time detected"
+
+# Memory Usage
+- alert: HighMemoryUsage
+  expr: nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.9
+  for: 5m
+  labels:
+      severity: critical
+  annotations:
+      summary: "High memory usage detected"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Metrics endpoint returns 401**
+
+    ```bash
+    # Check API key is set
+    echo $GRAFANA_API_KEY
+
+    # Test endpoint
+    curl -H "Authorization: Bearer your-api-key" \
+      http://localhost:3000/api/metrics/prometheus
+    ```
+
+2. **Prometheus can't scrape metrics**
+
+    ```yaml
+    # Check prometheus.yml configuration
+    # Verify target URL is accessible
+    # Check authorization credentials
+    ```
+
+3. **Missing metrics in Grafana**
+
+    ```bash
+    # Verify Prometheus is scraping
+    # Check Prometheus targets page
+    # Verify data source configuration
+    ```
+
+4. **High memory usage**
+    ```bash
+    # Check metrics registry size
+    # Consider reducing scrape frequency
+    # Monitor log file sizes
+    ```
+
+### Performance Optimization
+
+1. **Reduce Scrape Frequency**:
+
+    ```yaml
+    scrape_interval: 60s # Instead of 15s
+    ```
+
+2. **Filter Metrics**:
+
+    ```yaml
+    metric_relabel_configs:
+        - source_labels: [__name__]
+          regex: "nodejs_gc_.*"
+          action: drop
+    ```
+
+3. **Optimize Log Rotation**:
+    ```typescript
+    // In logger.ts
+    private maxFileSize: number = 10 * 1024 * 1024; // 10MB
+    private maxFiles: number = 5; // Keep fewer files
+    ```
+
 ## Security & Privacy
 
 ### Data Protection
@@ -260,89 +509,20 @@ curl -H "Authorization: Bearer <token>" \
 -   **No sensitive data** is logged (passwords, tokens, etc.)
 -   **User identification** uses email addresses only
 -   **IP addresses** are logged for security monitoring
--   **Content filtering** prevents logging of harmful content
-
-### Log Rotation
-
--   **File size limit**: 50MB per log file
--   **Retention**: 10 rotated files kept automatically
--   **Daily rotation**: New files created each day
--   **Cleanup**: Old files automatically deleted
+-   **API keys** are environment-based and rotatable
 
 ### Access Control
 
--   **Dashboard**: Requires authentication
--   **API**: Requires valid session
+-   **Metrics endpoints**: Require API key authentication
+-   **Dashboard**: Requires user session authentication
 -   **Log files**: Server filesystem access only
 
-## Troubleshooting
+### Best Practices
 
-### Common Issues
+1. **Rotate API keys** regularly (monthly recommended)
+2. **Use HTTPS** in production
+3. **Restrict network access** to metrics endpoints
+4. **Monitor access logs** for suspicious activity
+5. **Set up alerts** for authentication failures
 
-1. **Logs directory not created**
-
-    ```bash
-    mkdir logs
-    chmod 755 logs
-    ```
-
-2. **Permission errors**
-
-    ```bash
-    chown -R $(whoami) logs/
-    ```
-
-3. **Large log files**
-
-    - Check log rotation is working
-    - Reduce retention period if needed
-    - Monitor disk space usage
-
-4. **Missing metrics**
-    - Verify logging is enabled in production
-    - Check that middleware is properly applied
-    - Ensure API endpoints are being called
-
-### Performance Impact
-
--   **Disk I/O**: Minimal, async file writes
--   **Memory**: ~10MB additional usage for metrics
--   **CPU**: <1% overhead for logging operations
--   **Network**: No external dependencies required
-
-## Advanced Configuration
-
-### Custom Log Retention
-
-Edit `src/lib/logger.ts`:
-
-```typescript
-class Logger {
-	private maxFileSize: number = 100 * 1024 * 1024; // 100MB
-	private maxFiles: number = 20; // Keep 20 files
-}
-```
-
-### Custom Metrics
-
-Add your own metrics in `src/lib/metrics.ts`:
-
-```typescript
-// Add custom business metrics
-interface CustomMetrics {
-	subscriptionSignups: number;
-	revenueGenerated: number;
-	userEngagement: number;
-}
-```
-
-### Environment Variables
-
-```bash
-# .env.local
-LOG_LEVEL=info
-LOG_RETENTION_DAYS=30
-METRICS_CACHE_TTL=300
-```
-
-This logging system provides comprehensive monitoring for your LLM application with minimal setup required. It scales from simple standalone monitoring to full enterprise observability with Grafana integration.
+This comprehensive setup provides enterprise-grade monitoring for your LLM application with minimal configuration required.

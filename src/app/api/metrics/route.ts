@@ -1,17 +1,45 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { metricsCollector } from "@/lib/metrics";
 import { withLogging } from "@/lib/middleware";
 
+// Predefined API key for Grafana access
+const GRAFANA_API_KEY = process.env.GRAFANA_API_KEY;
+
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+	// Check for API key in Authorization header (for Grafana)
+	const authHeader = request.headers.get("authorization");
+	if (authHeader) {
+		const apiKey = authHeader.replace("Bearer ", "").replace("Basic ", "");
+		if (apiKey === GRAFANA_API_KEY) {
+			return true;
+		}
+	}
+
+	// Check for API key in query params (alternative for Grafana)
+	const { searchParams } = new URL(request.url);
+	const queryApiKey = searchParams.get("api_key");
+	if (queryApiKey === GRAFANA_API_KEY) {
+		return true;
+	}
+
+	// Fallback to session authentication for dashboard access
+	try {
+		const session = await getServerSession(authOptions);
+		return !!session;
+	} catch {
+		return false;
+	}
+}
+
 async function metricsHandler(request: NextRequest): Promise<NextResponse> {
 	try {
-		// Check authentication for metrics access
-		const session = await getServerSession(authOptions);
-		if (!session) {
+		// Check authentication (API key or session)
+		const authorized = await isAuthorized(request);
+		if (!authorized) {
 			return NextResponse.json(
-				{ error: "Unauthorized" },
+				{ error: "Unauthorized - API key or valid session required" },
 				{ status: 401 }
 			);
 		}
@@ -28,41 +56,58 @@ async function metricsHandler(request: NextRequest): Promise<NextResponse> {
 			);
 		}
 
-		const metrics = realtime
-			? metricsCollector.getRealTimeMetrics()
-			: metricsCollector.getMetrics(days);
-
 		// Return different formats based on request
 		switch (format) {
+			case "prometheus":
+				// Prometheus metrics format using prom-client
+				const prometheusMetrics =
+					await metricsCollector.getPrometheusMetrics();
+				return new NextResponse(prometheusMetrics, {
+					headers: {
+						"Content-Type": "text/plain; charset=utf-8",
+						"Cache-Control": "no-cache",
+					},
+				});
+
 			case "grafana":
 				// Grafana-compatible format
 				const grafanaMetrics = metricsCollector.getGrafanaMetrics(days);
-				return NextResponse.json(grafanaMetrics);
-
-			case "prometheus":
-				// Prometheus metrics format
-				const prometheusText = generatePrometheusMetrics(metrics);
-				return new NextResponse(prometheusText, {
-					headers: { "Content-Type": "text/plain; charset=utf-8" },
+				return NextResponse.json(grafanaMetrics, {
+					headers: {
+						"Cache-Control": "no-cache",
+					},
 				});
 
 			default:
 				// Standard JSON format with all details
-				return NextResponse.json({
-					status: "success",
-					data: {
-						...metrics,
-						auth: {
-							...metrics.auth,
-							uniqueUsers: Array.from(metrics.auth.uniqueUsers), // Convert Set to Array
+				const metrics = realtime
+					? metricsCollector.getRealTimeMetrics()
+					: metricsCollector.getMetrics(days);
+
+				return NextResponse.json(
+					{
+						status: "success",
+						data: {
+							...metrics,
+							auth: {
+								...metrics.auth,
+								uniqueUsers: Array.from(
+									metrics.auth.uniqueUsers
+								), // Convert Set to Array
+							},
+						},
+						metadata: {
+							generatedAt: new Date().toISOString(),
+							daysIncluded: days,
+							realtime,
 						},
 					},
-					metadata: {
-						generatedAt: new Date().toISOString(),
-						daysIncluded: days,
-						realtime,
-					},
-				});
+					{
+						headers: {
+							"Cache-Control": "no-cache",
+						},
+					}
+				);
 		}
 	} catch (error) {
 		console.error("Metrics API error:", error);
@@ -71,48 +116,6 @@ async function metricsHandler(request: NextRequest): Promise<NextResponse> {
 			{ status: 500 }
 		);
 	}
-}
-
-function generatePrometheusMetrics(metrics: any): string {
-	const timestamp = Date.now();
-
-	return `
-# HELP api_requests_total Total number of API requests
-# TYPE api_requests_total counter
-api_requests_total ${metrics.api.totalRequests} ${timestamp}
-
-# HELP api_response_time_avg Average API response time in milliseconds
-# TYPE api_response_time_avg gauge
-api_response_time_avg ${metrics.api.averageResponseTime} ${timestamp}
-
-# HELP api_error_rate Percentage of failed requests
-# TYPE api_error_rate gauge
-api_error_rate ${metrics.api.errorRate} ${timestamp}
-
-# HELP api_unique_users Number of unique users
-# TYPE api_unique_users gauge
-api_unique_users ${metrics.api.uniqueUsers} ${timestamp}
-
-# HELP auth_logins_total Total number of successful logins
-# TYPE auth_logins_total counter
-auth_logins_total ${metrics.auth.totalLogins} ${timestamp}
-
-# HELP auth_failed_logins_total Total number of failed login attempts
-# TYPE auth_failed_logins_total counter
-auth_failed_logins_total ${metrics.auth.failedLogins} ${timestamp}
-
-# HELP chat_messages_total Total number of chat messages
-# TYPE chat_messages_total counter
-chat_messages_total ${metrics.chat.totalChats} ${timestamp}
-
-# HELP chat_tokens_total Total tokens used in chat
-# TYPE chat_tokens_total counter
-chat_tokens_total ${metrics.chat.totalTokens} ${timestamp}
-
-# HELP chat_unique_users Number of unique chat users
-# TYPE chat_unique_users gauge
-chat_unique_users ${metrics.chat.uniqueChatUsers} ${timestamp}
-`.trim();
 }
 
 // Wrap the handler with logging
