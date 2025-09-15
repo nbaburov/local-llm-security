@@ -113,7 +113,7 @@ async function chatHandler(request: NextRequest): Promise<NextResponse> {
 
 			// Try OpenRouter as fallback
 			const openRouterParams = {
-				model: "google/gemma-3-1b-it:free", // Free model on OpenRouter
+				model: "google/gemma-3-4b-it:free", // Free model on OpenRouter
 				messages: messages,
 				temperature: temperature || 0.7,
 				max_tokens: max_tokens || 2048,
