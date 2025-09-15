@@ -810,7 +810,7 @@ async function timeoutProtectedFetch(
 
 			// Convert Ollama format to OpenRouter format
 			const openRouterParams = {
-				model: "google/gemma-3-1b-it:free", // Free model on OpenRouter
+				model: "google/gemma-3-4b-it:free", // Free model on OpenRouter
 				messages: requestParams.messages,
 				temperature: requestParams.temperature || 0.7,
 				max_tokens: requestParams.max_tokens || 2048,
