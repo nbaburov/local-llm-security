@@ -4,8 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { metricsCollector } from "@/lib/metrics";
 
 // Predefined API key for Grafana access
-const GRAFANA_API_KEY =
-	process.env.GRAFANA_API_KEY || "grafana-metrics-key-2024";
+const GRAFANA_API_KEY = process.env.GRAFANA_API_KEY;
 
 async function isAuthorized(request: NextRequest): Promise<boolean> {
 	// Check for API key in Authorization header (for Grafana)
