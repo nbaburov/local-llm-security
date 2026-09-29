@@ -38,7 +38,7 @@ Metrics are exposed in Prometheus format at `/api/metrics/prometheus`, authorise
 Requires Node.js 18+ and either [Ollama](https://ollama.com) or an OpenRouter API key.
 
 ```bash
-git clone https://github.com/nixxxo/local-llm-security.git
+git clone https://github.com/nbaburov/local-llm-security.git
 cd local-llm-security
 npm install
 cp .env.example .env.local   # fill in what you need, see Configuration
