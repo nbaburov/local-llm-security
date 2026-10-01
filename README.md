@@ -91,4 +91,4 @@ N. B., D. N., J. M., M. M., A. M. (Fontys University of Applied Sciences).
 
 ## License
 
-MIT: see [LICENSE](LICENSE).
+[PolyForm Noncommercial 1.0.0](LICENSE): free for any noncommercial use with attribution. Commercial use needs a separate paid license from the authors; contact [NB Limited](https://nb-limited.com).
