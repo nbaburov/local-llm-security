@@ -2,9 +2,7 @@
 
 A side-by-side lab of a deliberately vulnerable LLM chat endpoint and a hardened one, built to show how common attacks against locally hosted language models work and which controls stop them.
 
-Group research project, Fontys University of Applied Sciences (cybersecurity specialisation, 2025). Write-up: [Securing a chatbot, twice](https://nb.nb-limited.com/writing/securing-a-chatbot-twice).
-
-> Shared as a reference. Not actively maintained for external contributions.
+Group research project, Fontys University of Applied Sciences (cybersecurity specialisation, 2025). Write-up: [Teaching a chatbot to say no](https://nb.nb-limited.com/writing/teaching-a-chatbot-to-say-no)
 
 ## What it does
 
@@ -85,10 +83,27 @@ All variables go in `.env.local`. See [`.env.example`](.env.example).
 
 Gist logging setup: [`GITHUB_GIST_LOGGING_SETUP.md`](GITHUB_GIST_LOGGING_SETUP.md).
 
+## Status
+
+Finished university project, frozen at the June 2025 hand-in plus later dependency and documentation updates. It is not deployed anywhere and receives no feature work.
+
+## Known issues
+
+Carried over from the original project and left as they were:
+
+- **Bans never lift.** The cleanup job resets each entry's timestamp before the blacklist check reads it, so a banned IP stays banned until the server restarts (`src/app/api/secure-chat/route.ts`).
+- **Rate limits trust `X-Forwarded-For`.** The client IP is read from that header, so a caller can rotate it to dodge the limit and the ban.
+- **Any Google account can sign in.** The `signIn` callback logs the attempt and always allows it; there is no allowlist (`src/lib/auth.ts`).
+- **Logs are open to any signed-in user.** `/api/logs` checks only that a session exists, not who it belongs to.
+- **The prompt-leakage demo is simulated.** Both endpoints are stateless, so the second session's answer is scripted to show what a leak looks like.
+- **Prompts leave the machine on the secure path.** The Nightfall scan sends the prompt and the answer to Nightfall's cloud, and when Ollama is unreachable both endpoints fall back to OpenRouter.
+
 ## Authors
 
 N. B., D. N., J. M., M. M., A. M. (Fontys University of Applied Sciences).
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE): free for any noncommercial use with attribution. Commercial use needs a separate paid license from the authors; contact [NB Limited](https://nb-limited.com).
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may read, run, modify and share it for any noncommercial purpose, as long as the copyright notice comes along.
+
+This repository is a showcase, so it doesn't take issues or pull requests. Forks are welcome under the license. Commercial use needs a separate paid license; contact [NB Limited](https://nb-limited.com).
