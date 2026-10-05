@@ -1,0 +1,6 @@
+# Placeholder values in setup docs (abc123def456, your-api-key, YOUR_SESSION_TOKEN), not secrets.
+5f4fb384b1c576b1a5e8c375353226d98516df2c:GITHUB_GIST_LOGGING_SETUP.md:generic-api-key:126
+5f4fb384b1c576b1a5e8c375353226d98516df2c:GITHUB_GIST_LOGGING_SETUP.md:generic-api-key:127
+590a9e42cf8c55d58c17671e6e8ca15e32ba905a:EDGE_CONFIG_SETUP.md:curl-auth-header:58
+7892ca605a06cb1adbde94b94a6d334915bc2a8a:grafana-config-examples/README.md:curl-auth-header:51
+7892ca605a06cb1adbde94b94a6d334915bc2a8a:LOGGING_SETUP.md:curl-auth-header:454
