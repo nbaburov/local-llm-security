@@ -2,7 +2,7 @@
 
 A side-by-side lab of a deliberately vulnerable LLM chat endpoint and a hardened one, built to show how common attacks against locally hosted language models work and which controls stop them.
 
-Group research project, Fontys University of Applied Sciences (cybersecurity specialisation, 2025). The written research is [on Notion](https://nbaburov.notion.site/Local-LLM-Secure-Research-217258cb140c8089a55bd31b12861c1a?pvs=74).
+Group research project, Fontys University of Applied Sciences (cybersecurity specialisation, 2025). Write-up: [Securing a chatbot, twice](https://nb.nb-limited.com/writing/securing-a-chatbot-twice).
 
 > Shared as a reference. Not actively maintained for external contributions.
 
